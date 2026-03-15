@@ -1,0 +1,93 @@
+export type HistoryType = 'text' | 'image' | 'file'
+
+export interface HistoryMetadata {
+  fileName?: string
+  fileSize?: number
+  fileType?: string
+  imageWidth?: number
+  imageHeight?: number
+}
+
+export interface HistoryItem {
+  id: string
+  type: HistoryType
+  content: string
+  copyCount: number
+  createdAt: string
+  updatedAt: string
+  isFavorited: boolean
+  remark: string
+  metadata?: HistoryMetadata
+}
+
+export type CommandType = 'open_dir' | 'url' | 'shell' | 'script'
+
+export interface Command {
+  id: string
+  name: string
+  type: CommandType
+  path?: string
+  url?: string
+  command?: string
+  shortcut?: string
+  icon?: string
+  description?: string
+}
+
+export interface AppConfig {
+  window: {
+    width: number
+    height: number
+  }
+  shortcuts: {
+    toggleWindow: string
+    openSettings: string
+  }
+  general: {
+    autoStart: boolean
+    historyRetentionDays: number
+    maxHistoryItems: number
+    imageStorageLimitMB: number
+  }
+}
+
+export type TabType = 'all' | 'text' | 'image' | 'favorites' | 'commands'
+
+export interface ClipboardContent {
+  type: HistoryType
+  content: string
+  formats?: string[]
+}
+
+export interface ElectronAPI {
+  getHistory: () => Promise<HistoryItem[]>
+  addHistory: (item: Partial<HistoryItem>) => Promise<HistoryItem>
+  deleteHistory: (id: string) => Promise<boolean>
+  clearHistory: () => Promise<void>
+
+  getFavorites: () => Promise<{ id: string; remark: string; createdAt: string }[]>
+  toggleFavorite: (id: string) => Promise<boolean>
+  updateRemark: (id: string, remark: string) => Promise<boolean>
+
+  getConfig: () => Promise<AppConfig>
+  updateConfig: (config: Partial<AppConfig>) => Promise<AppConfig>
+
+  getCommands: () => Promise<Command[]>
+  addCommand: (command: Omit<Command, 'id'>) => Promise<Command>
+  updateCommand: (id: string, command: Partial<Command>) => Promise<Command | undefined>
+  deleteCommand: (id: string) => Promise<boolean>
+  executeCommand: (id: string, params?: Record<string, string>) => Promise<unknown>
+
+  readClipboard: () => Promise<ClipboardContent>
+  writeClipboard: (text: string) => Promise<boolean>
+  writeImageClipboard: (dataUrl: string) => Promise<boolean>
+  pasteTextAtCursor: (text: string) => Promise<boolean>
+
+  hideWindow: () => Promise<void>
+  showWindow: () => Promise<void>
+  toggleWindow: () => Promise<void>
+
+  onClipboardChange: (callback: (item: HistoryItem) => void) => () => void
+  onShortcutTriggered: (callback: (action: string) => void) => () => void
+  onWindowOpened: (callback: () => void) => () => void
+}

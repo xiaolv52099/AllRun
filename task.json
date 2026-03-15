@@ -1,0 +1,296 @@
+{
+  "project": "AllRun - macOS 剪切板管理器",
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "id": "task-001",
+      "phase": "项目初始化",
+      "title": "初始化 Electron + React + TypeScript 项目",
+      "description": "使用 Vite 创建 Electron + React + TypeScript 项目，配置开发环境",
+      "status": "completed",
+      "dependencies": [],
+      "priority": "high",
+      "estimated_time": "30min",
+      "files": ["package.json", "tsconfig.json", "vite.config.ts", "electron/main.ts", "electron/preload.ts", "src/main.tsx", "src/App.tsx", "index.html"]
+    },
+    {
+      "id": "task-002",
+      "phase": "项目初始化",
+      "title": "配置 Tailwind CSS 和基础样式",
+      "description": "安装 Tailwind CSS，配置主题，创建基础样式文件",
+      "status": "completed",
+      "dependencies": ["task-001"],
+      "priority": "high",
+      "estimated_time": "15min",
+      "files": ["tailwind.config.js", "src/index.css"]
+    },
+    {
+      "id": "task-003",
+      "phase": "项目初始化",
+      "title": "配置 Electron 主进程和预加载脚本",
+      "description": "创建主进程窗口管理，配置 IPC 通信，设置预加载脚本暴露 API",
+      "status": "completed",
+      "dependencies": ["task-001"],
+      "priority": "high",
+      "estimated_time": "30min",
+      "files": ["electron/main.ts", "electron/preload.ts"]
+    },
+    {
+      "id": "task-004",
+      "phase": "核心功能",
+      "title": "实现剪切板监听模块",
+      "description": "创建剪切板轮询监听，支持文本、图片、文件类型检测",
+      "status": "completed",
+      "dependencies": ["task-003"],
+      "priority": "high",
+      "estimated_time": "45min",
+      "files": ["electron/clipboard/watcher.ts", "electron/clipboard/parser.ts"]
+    },
+    {
+      "id": "task-005",
+      "phase": "核心功能",
+      "title": "实现历史记录数据存储",
+      "description": "创建 history.json 存储模块，支持增删改查、去重计数",
+      "status": "completed",
+      "dependencies": ["task-003"],
+      "priority": "high",
+      "estimated_time": "30min",
+      "files": ["electron/store/history.ts", "electron/store/types.ts"]
+    },
+    {
+      "id": "task-006",
+      "phase": "核心功能",
+      "title": "实现图片 WebP 转换和存储",
+      "description": "使用 sharp 将剪切板图片转为 WebP，实现存储和清理逻辑",
+      "status": "completed",
+      "dependencies": ["task-004", "task-005"],
+      "priority": "medium",
+      "estimated_time": "45min",
+      "files": ["electron/clipboard/imageHandler.ts"]
+    },
+    {
+      "id": "task-007",
+      "phase": "核心功能",
+      "title": "实现收藏功能数据存储",
+      "description": "创建 favorites.json 存储，支持收藏状态切换和备注编辑",
+      "status": "completed",
+      "dependencies": ["task-005"],
+      "priority": "medium",
+      "estimated_time": "20min",
+      "files": ["electron/store/favorites.ts"]
+    },
+    {
+      "id": "task-008",
+      "phase": "核心功能",
+      "title": "实现配置管理模块",
+      "description": "创建 config.json 存储模块，管理窗口尺寸、快捷键、通用设置",
+      "status": "completed",
+      "dependencies": ["task-003"],
+      "priority": "high",
+      "estimated_time": "25min",
+      "files": ["electron/store/config.ts"]
+    },
+    {
+      "id": "task-009",
+      "phase": "UI 组件",
+      "title": "创建状态管理 Store (Zustand)",
+      "description": "使用 Zustand 创建全局状态管理，包含历史记录、搜索、设置等状态",
+      "status": "completed",
+      "dependencies": ["task-001"],
+      "priority": "high",
+      "estimated_time": "30min",
+      "files": ["src/stores/useStore.ts", "src/types/index.ts"]
+    },
+    {
+      "id": "task-010",
+      "phase": "UI 组件",
+      "title": "实现搜索栏组件",
+      "description": "创建搜索框，实现自动聚焦、防抖搜索、IPC 调用",
+      "status": "completed",
+      "dependencies": ["task-009"],
+      "priority": "high",
+      "estimated_time": "30min",
+      "files": ["src/components/SearchBar.tsx", "src/hooks/useSearch.ts"]
+    },
+    {
+      "id": "task-011",
+      "phase": "UI 组件",
+      "title": "实现 Tab 导航组件",
+      "description": "创建 Tab 栏：全部/文本/收藏/指令，支持切换和键盘快捷键",
+      "status": "completed",
+      "dependencies": ["task-009"],
+      "priority": "high",
+      "estimated_time": "25min",
+      "files": ["src/components/TabBar.tsx"]
+    },
+    {
+      "id": "task-012",
+      "phase": "UI 组件",
+      "title": "实现历史列表项组件",
+      "description": "创建单条历史记录展示组件，支持文本、图片、文件三种类型渲染",
+      "status": "completed",
+      "dependencies": ["task-009"],
+      "priority": "high",
+      "estimated_time": "40min",
+      "files": ["src/components/HistoryItem.tsx"]
+    },
+    {
+      "id": "task-013",
+      "phase": "UI 组件",
+      "title": "实现虚拟滚动历史列表",
+      "description": "使用 react-window 实现虚拟滚动列表，集成键盘导航",
+      "status": "completed",
+      "dependencies": ["task-012"],
+      "priority": "high",
+      "estimated_time": "45min",
+      "files": ["src/components/HistoryList.tsx", "src/hooks/useKeyboard.ts"]
+    },
+    {
+      "id": "task-014",
+      "phase": "UI 组件",
+      "title": "实现搜索高亮功能",
+      "description": "使用 fuse.js 实现模糊搜索，在结果中高亮匹配字符",
+      "status": "completed",
+      "dependencies": ["task-010", "task-013"],
+      "priority": "medium",
+      "estimated_time": "30min",
+      "files": ["src/utils/highlight.ts", "src/hooks/useSearch.ts"]
+    },
+    {
+      "id": "task-015",
+      "phase": "高级功能",
+      "title": "实现自动粘贴功能",
+      "description": "记录前台窗口，选择后恢复焦点并模拟 Cmd+V 粘贴",
+      "status": "completed",
+      "dependencies": ["task-013"],
+      "priority": "high",
+      "estimated_time": "40min",
+      "files": ["electron/utils/autoPaste.ts", "src/hooks/usePaste.ts"]
+    },
+    {
+      "id": "task-016",
+      "phase": "高级功能",
+      "title": "实现全局快捷键唤起",
+      "description": "注册全局快捷键 Cmd+1 唤起/隐藏窗口，支持自定义配置",
+      "status": "completed",
+      "dependencies": ["task-003", "task-008"],
+      "priority": "high",
+      "estimated_time": "30min",
+      "files": ["electron/utils/shortcut.ts"]
+    },
+    {
+      "id": "task-017",
+      "phase": "高级功能",
+      "title": "实现窗口尺寸记忆",
+      "description": "保存和恢复窗口尺寸，支持最小尺寸限制",
+      "status": "completed",
+      "dependencies": ["task-008"],
+      "priority": "medium",
+      "estimated_time": "20min",
+      "files": ["electron/utils/window.ts"]
+    },
+    {
+      "id": "task-018",
+      "phase": "快捷指令",
+      "title": "实现快捷指令存储和执行器",
+      "description": "创建 commands.json 存储，实现 open_dir/url/shell/script 四种指令执行",
+      "status": "completed",
+      "dependencies": ["task-003"],
+      "priority": "medium",
+      "estimated_time": "50min",
+      "files": ["electron/commands/executor.ts", "electron/store/commands.ts"]
+    },
+    {
+      "id": "task-019",
+      "phase": "快捷指令",
+      "title": "实现指令 Tab 展示和执行",
+      "description": "在指令 Tab 中展示快捷指令列表，支持点击执行",
+      "status": "completed",
+      "dependencies": ["task-018"],
+      "priority": "medium",
+      "estimated_time": "30min",
+      "files": ["src/components/CommandsList.tsx"]
+    },
+    {
+      "id": "task-020",
+      "phase": "设置界面",
+      "title": "实现设置弹窗组件",
+      "description": "创建设置弹窗，包含通用设置、快捷键设置、指令编辑器 Tab",
+      "status": "completed",
+      "dependencies": ["task-009"],
+      "priority": "medium",
+      "estimated_time": "45min",
+      "files": ["src/components/Settings.tsx", "src/components/settings/GeneralTab.tsx", "src/components/settings/ShortcutsTab.tsx", "src/components/settings/CommandsTab.tsx"]
+    },
+    {
+      "id": "task-021",
+      "phase": "设置界面",
+      "title": "实现快捷键可视化录入",
+      "description": "创建快捷键输入组件，支持检测按键组合，实时更新配置",
+      "status": "completed",
+      "dependencies": ["task-020"],
+      "priority": "medium",
+      "estimated_time": "35min",
+      "files": ["src/components/ShortcutInput.tsx"]
+    },
+    {
+      "id": "task-022",
+      "phase": "设置界面",
+      "title": "实现快捷指令编辑器",
+      "description": "表格形式增删改指令，支持测试运行、导入导出",
+      "status": "completed",
+      "dependencies": ["task-020", "task-018"],
+      "priority": "medium",
+      "estimated_time": "40min",
+      "files": ["src/components/settings/CommandsTab.tsx"]
+    },
+    {
+      "id": "task-023",
+      "phase": "设置界面",
+      "title": "实现开机自启功能",
+      "description": "使用 app.setLoginItemSettings 实现开机自启设置",
+      "status": "completed",
+      "dependencies": ["task-003"],
+      "priority": "low",
+      "estimated_time": "15min",
+      "files": ["electron/utils/autoStart.ts"]
+    },
+    {
+      "id": "task-024",
+      "phase": "打包部署",
+      "title": "配置 electron-builder 打包",
+      "description": "创建 electron-builder 配置，设置 macOS DMG 打包选项",
+      "status": "completed",
+      "dependencies": ["task-001"],
+      "priority": "medium",
+      "estimated_time": "25min",
+      "files": ["electron-builder.json"]
+    },
+    {
+      "id": "task-025",
+      "phase": "打包部署",
+      "title": "创建 README 文档",
+      "description": "编写项目介绍、安装说明、开发调试、打包指令",
+      "status": "completed",
+      "dependencies": ["task-024"],
+      "priority": "low",
+      "estimated_time": "20min",
+      "files": ["README.md"]
+    }
+  ],
+  "statistics": {
+    "total_tasks": 25,
+    "completed": 25,
+    "in_progress": 0,
+    "pending": 0,
+    "phases": {
+      "项目初始化": 3,
+      "核心功能": 5,
+      "UI 组件": 6,
+      "高级功能": 3,
+      "快捷指令": 2,
+      "设置界面": 4,
+      "打包部署": 2
+    }
+  }
+}
