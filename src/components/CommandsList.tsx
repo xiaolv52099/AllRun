@@ -3,6 +3,9 @@ import Fuse from 'fuse.js'
 import { useStore } from '../stores/useStore'
 import { Command } from '../types'
 import { Play, Trash2 } from 'lucide-react'
+import CommandParamsDialog from './CommandParamsDialog'
+import { parseCommandParamInput, parseCommandParamNames } from '../utils/commandParams'
+import { useI18n } from '../hooks/useI18n'
 
 const commandFuseOptions = {
   keys: ['name', 'description', 'path', 'url', 'command'],
@@ -40,7 +43,12 @@ export default function CommandsList() {
     selectedIndex,
     setSelectedIndex,
   } = useStore()
+  const { t } = useI18n()
   const [executingId, setExecutingId] = useState<string | null>(null)
+  const [paramDialogState, setParamDialogState] = useState<{
+    command: Command
+    paramNames: string[]
+  } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // 加载快捷指令
@@ -71,22 +79,56 @@ export default function CommandsList() {
     }
   }, [filteredCommands.length, selectedIndex, setSelectedIndex])
 
-  const handleExecute = useCallback(async (command: Command) => {
+  const runCommand = useCallback(async (
+    command: Command,
+    params?: {
+      commandArgs?: string[]
+      commandNamedArgs?: Record<string, string>
+      rawInput?: string
+    }
+  ) => {
     setExecutingId(command.id)
     try {
-      await window.electronAPI.executeCommand(command.id)
+      await window.electronAPI.executeCommand(command.id, params)
+      return true
     } catch (error) {
       console.error('Failed to execute command:', error)
-      alert(`执行失败: ${(error as Error).message}`)
+      alert(t('error.executeFailed', { message: (error as Error).message }))
+      return false
     } finally {
       setExecutingId(null)
     }
-  }, [])
+  }, [t])
+
+  const handleExecute = useCallback(async (command: Command) => {
+    const paramNames = parseCommandParamNames(command.bashParams)
+    if (command.type === 'shell' && paramNames.length > 0) {
+      setParamDialogState({ command, paramNames })
+      return
+    }
+    await runCommand(command)
+  }, [runCommand])
+
+  const handleConfirmParams = useCallback(async (input: string) => {
+    if (!paramDialogState) return
+
+    const parsed = parseCommandParamInput(input, paramDialogState.paramNames)
+    const succeeded = await runCommand(paramDialogState.command, {
+      rawInput: input,
+      commandArgs: parsed.orderedArgs,
+      commandNamedArgs: parsed.namedArgs,
+    })
+
+    if (succeeded) {
+      setParamDialogState(null)
+    }
+  }, [paramDialogState, runCommand])
 
   useEffect(() => {
     if (activeTab !== 'commands') return
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (paramDialogState) return
       if (filteredCommands.length === 0) return
 
       const target = e.target as HTMLElement | null
@@ -112,7 +154,7 @@ export default function CommandsList() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTab, filteredCommands, handleExecute, selectedIndex, setSelectedIndex])
+  }, [activeTab, filteredCommands, handleExecute, paramDialogState, selectedIndex, setSelectedIndex])
 
   useEffect(() => {
     if (activeTab !== 'commands') return
@@ -133,7 +175,7 @@ export default function CommandsList() {
   }, [setSelectedIndex])
 
   const handleDelete = async (id: string) => {
-    if (confirm('确定要删除这个指令吗？')) {
+    if (confirm(t('commands.deleteConfirm'))) {
       await window.electronAPI.deleteCommand(id)
       setCommands(commands.filter((cmd) => cmd.id !== id))
     }
@@ -156,75 +198,86 @@ export default function CommandsList() {
   }
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto">
-      {filteredCommands.length === 0 ? (
-        <div className="flex items-center justify-center h-full">
-          <p className="text-[#9da0a6]">
-            {searchQuery ? '没有匹配的指令' : '暂无快捷指令，请在设置中添加'}
-          </p>
-        </div>
-      ) : (
-        <div className="divide-y divide-[#2d2d30]">
-          {filteredCommands.map((command, index) => (
-            <div
-              key={command.id}
-              data-command-index={index}
-              className={`group px-3 py-1.5 cursor-pointer transition-colors ${
-                index === selectedIndex
-                  ? 'bg-[#04395e]'
-                  : 'hover:bg-[#2a2d2e]'
-              }`}
-              onMouseEnter={() => setSelectedIndex(index)}
-              onClick={() => {
-                setSelectedIndex(index)
-                handleExecute(command)
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">{getCommandIcon(command.type)}</span>
-                  <div>
-                    <p className="text-sm font-medium text-[#d4d4d4]">
-                      {highlightKeyword(command.name, searchQuery)}
-                    </p>
-                    <p className="text-xs text-[#9da0a6]">
-                      {command.description || command.path || command.url || command.command}
-                    </p>
+    <>
+      <div ref={containerRef} className="h-full overflow-y-auto">
+        {filteredCommands.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-[var(--color-text-secondary)]">
+              {searchQuery ? t('commands.noMatch') : t('commands.empty')}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-[var(--color-border-muted)]">
+            {filteredCommands.map((command, index) => (
+              <div
+                key={command.id}
+                data-command-index={index}
+                className={`group px-3 py-1.5 cursor-pointer transition-colors ${
+                  index === selectedIndex
+                    ? 'bg-[var(--color-selected)]'
+                    : 'hover:bg-[var(--color-bg-hover)]'
+                }`}
+                onMouseEnter={() => setSelectedIndex(index)}
+                onClick={() => {
+                  setSelectedIndex(index)
+                  handleExecute(command)
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{getCommandIcon(command.type)}</span>
+                    <div>
+                      <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                        {highlightKeyword(command.name, searchQuery)}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-secondary)]">
+                        {command.description || command.path || command.url || command.command}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleExecute(command)
+                      }}
+                      disabled={executingId === command.id}
+                      className="p-1.5 rounded hover:bg-[var(--color-border)]"
+                      title={t('common.execute')}
+                    >
+                      <Play
+                        className={`w-4 h-4 text-[var(--color-text-secondary)] ${
+                          executingId === command.id ? 'animate-pulse' : ''
+                        }`}
+                      />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(command.id)
+                      }}
+                      className="p-1.5 rounded hover:bg-[var(--color-border)]"
+                      title={t('common.delete')}
+                    >
+                      <Trash2 className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleExecute(command)
-                    }}
-                    disabled={executingId === command.id}
-                    className="p-1.5 rounded hover:bg-[#3c3c3c]"
-                    title="执行"
-                  >
-                    <Play
-                      className={`w-4 h-4 text-[#9da0a6] ${
-                        executingId === command.id ? 'animate-pulse' : ''
-                      }`}
-                    />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDelete(command.id)
-                    }}
-                    className="p-1.5 rounded hover:bg-[#3c3c3c]"
-                    title="删除"
-                  >
-                    <Trash2 className="w-4 h-4 text-[#9da0a6]" />
-                  </button>
-                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {paramDialogState && (
+        <CommandParamsDialog
+          commandName={paramDialogState.command.name}
+          paramNames={paramDialogState.paramNames}
+          onCancel={() => setParamDialogState(null)}
+          onConfirm={handleConfirmParams}
+        />
       )}
-    </div>
+    </>
   )
 }

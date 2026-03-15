@@ -6,6 +6,27 @@
   font-family: "Segoe UI", "SF Pro Text", "PingFang SC", sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  --color-bg-primary: #1e1e1e;
+  --color-bg-secondary: #252526;
+  --color-bg-hover: #2a2d2e;
+  --color-bg-tab-active: #1f1f1f;
+  --color-border: #3c3c3c;
+  --color-border-muted: #2d2d30;
+  --color-text-primary: #d4d4d4;
+  --color-text-secondary: #9da0a6;
+  --color-text-strong: #ffffff;
+  --color-title: #c5c5c5;
+  --color-accent: #0e639c;
+  --color-accent-hover: #1177bb;
+  --color-selected: #04395e;
+  --color-danger: #f48771;
+  --color-danger-border: #6b2f2b;
+  --color-danger-hover-bg: #3a1f1c;
+  --color-muted-button: #3a3d41;
+  --color-muted-button-hover: #4a4d51;
+  --color-scrollbar-thumb: #3c3c3c;
+  --color-scrollbar-thumb-hover: #4f4f4f;
+  --color-image-thumb-bg: #111111;
   color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -13,13 +34,38 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-theme="light"] {
+  --color-bg-primary: #f7f7f7;
+  --color-bg-secondary: #ffffff;
+  --color-bg-hover: #ececec;
+  --color-bg-tab-active: #f1f1f1;
+  --color-border: #d5d5d5;
+  --color-border-muted: #e5e5e5;
+  --color-text-primary: #202020;
+  --color-text-secondary: #666666;
+  --color-text-strong: #111111;
+  --color-title: #303030;
+  --color-accent: #0b66c3;
+  --color-accent-hover: #0958a8;
+  --color-selected: #d9ecff;
+  --color-danger: #c44836;
+  --color-danger-border: #d9a59d;
+  --color-danger-hover-bg: #f8e3df;
+  --color-muted-button: #cbcbcb;
+  --color-muted-button-hover: #b7b7b7;
+  --color-scrollbar-thumb: #c2c2c2;
+  --color-scrollbar-thumb-hover: #a8a8a8;
+  --color-image-thumb-bg: #ececec;
+  color-scheme: light;
+}
+
 body {
   margin: 0;
   min-width: 360px;
   min-height: 400px;
   overflow: hidden;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 /* 自定义滚动条 */
@@ -32,18 +78,18 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3c3c3c;
+  background: var(--color-scrollbar-thumb);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4f4f4f;
+  background: var(--color-scrollbar-thumb-hover);
 }
 
 /* 搜索高亮 */
 .highlight {
   background-color: #d18616;
-  color: #1e1e1e;
+  color: var(--color-bg-primary);
   border-radius: 2px;
   padding: 0 2px;
 }

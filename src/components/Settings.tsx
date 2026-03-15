@@ -1,23 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../stores/useStore'
 import GeneralTab from './settings/GeneralTab'
 import ShortcutsTab from './settings/ShortcutsTab'
 import CommandsTab from './settings/CommandsTab'
+import { useI18n } from '../hooks/useI18n'
 
 type SettingsTab = 'general' | 'shortcuts' | 'commands'
 
-const tabs: { id: SettingsTab; label: string }[] = [
-  { id: 'general', label: '通用' },
-  { id: 'shortcuts', label: '快捷键' },
-  { id: 'commands', label: '快捷指令' },
-]
-
 export default function Settings() {
-  const { setShowSettings, setConfig } = useStore()
+  const { setConfig } = useStore()
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
 
-  // 加载配置
+  const tabs: { id: SettingsTab; label: string }[] = [
+    { id: 'general', label: t('settings.tab.general') },
+    { id: 'shortcuts', label: t('settings.tab.shortcuts') },
+    { id: 'commands', label: t('settings.tab.commands') },
+  ]
+
   useEffect(() => {
     const loadConfig = async () => {
       try {
@@ -30,34 +31,37 @@ export default function Settings() {
     loadConfig()
   }, [setConfig])
 
-  const handleClose = () => {
-    setShowSettings(false)
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg shadow-xl w-[600px] max-h-[80vh] overflow-hidden animate-fade-in">
-        {/* 标题栏 */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#3c3c3c] bg-[#252526]">
-          <h2 className="text-lg font-semibold text-[#d4d4d4]">设置</h2>
+    <div className="h-screen flex flex-col bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
+      <div className="drag-region relative h-8 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
+        <div className="absolute left-2 inset-y-0 flex items-center">
           <button
-            onClick={handleClose}
-            className="p-1 rounded hover:bg-[#2a2d2e]"
+            onClick={() => window.electronAPI.closeSettingsWindow()}
+            className="no-drag w-3 h-3 rounded-full bg-[#ff5f57] flex items-center justify-center hover:brightness-110 transition"
+            title={t('window.close')}
           >
-            <X className="w-5 h-5 text-[#9da0a6]" />
+            <X className="w-2 h-2 text-black/80" strokeWidth={2.5} />
           </button>
         </div>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-xs text-[var(--color-title)] font-medium">{t('settings.title')}</span>
+        </div>
+      </div>
 
-        {/* Tab 栏 */}
-        <div className="flex border-b border-[#3c3c3c] bg-[#252526]">
+      <div className="no-drag flex-1 flex flex-col overflow-hidden">
+        <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+          <p className="text-xs text-[var(--color-text-secondary)]">{t('window.dragResizeHint')}</p>
+        </div>
+
+        <div className="flex border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === tab.id
-                  ? 'text-[#ffffff] border-b-2 border-[#0e639c] bg-[#1f1f1f]'
-                  : 'text-[#9da0a6] hover:text-[#d4d4d4] hover:bg-[#2a2d2e]'
+                  ? 'text-[var(--color-text-strong)] border-b-2 border-[var(--color-accent)] bg-[var(--color-bg-tab-active)]'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]'
               }`}
             >
               {tab.label}
@@ -65,8 +69,7 @@ export default function Settings() {
           ))}
         </div>
 
-        {/* 内容区域 */}
-        <div className="p-4 overflow-y-auto max-h-[calc(80vh-120px)] bg-[#1e1e1e] text-[#d4d4d4]">
+        <div className="p-4 overflow-y-auto flex-1 bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
           {activeTab === 'general' && <GeneralTab />}
           {activeTab === 'shortcuts' && <ShortcutsTab />}
           {activeTab === 'commands' && <CommandsTab />}

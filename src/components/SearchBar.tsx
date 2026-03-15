@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, X } from 'lucide-react'
 import { useStore } from '../stores/useStore'
+import { useI18n } from '../hooks/useI18n'
 
 export default function SearchBar() {
   const { searchQuery, setSearchQuery } = useStore()
+  const { t } = useI18n()
   const [localQuery, setLocalQuery] = useState(searchQuery)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -48,24 +50,24 @@ export default function SearchBar() {
   }, [setSearchQuery])
 
   return (
-    <div className="p-3 border-b border-[#3c3c3c] bg-[#252526]">
+    <div className="p-3 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9da0a6]" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-secondary)]" />
         <input
           ref={inputRef}
           id="search-input"
           type="text"
           value={localQuery}
           onChange={(e) => setLocalQuery(e.target.value)}
-          placeholder="搜索内容"
-          className="w-full pl-10 pr-8 py-2 text-sm text-[#d4d4d4] bg-[#1e1e1e] border border-[#3c3c3c] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0e639c] focus:border-transparent"
+          placeholder={t('search.placeholder')}
+          className="w-full pl-10 pr-8 py-2 text-sm text-[var(--color-text-primary)] bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
         />
         {localQuery && (
           <button
             onClick={handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-[#3c3c3c]"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-[var(--color-border)]"
           >
-            <X className="w-3.5 h-3.5 text-[#9da0a6]" />
+            <X className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
           </button>
         )}
       </div>

@@ -1,31 +1,46 @@
 import { useStore } from '../../stores/useStore'
 import { useState, useEffect } from 'react'
+import { languageOptions, type LanguageCode } from '../../i18n'
+import { useI18n } from '../../hooks/useI18n'
+
+const defaultGeneralConfig = {
+  autoStart: false,
+  historyRetentionDays: 30,
+  maxHistoryItems: 100,
+  imageStorageLimitMB: 200,
+}
+
+const defaultAppearanceConfig = {
+  theme: 'dark' as const,
+  settingsZoom: 100,
+  language: 'zh-CN' as LanguageCode,
+}
 
 export default function GeneralTab() {
   const { config, setConfig } = useStore()
-  const [localConfig, setLocalConfig] = useState(config?.general || {
-    autoStart: false,
-    historyRetentionDays: 30,
-    maxHistoryItems: 100,
-    imageStorageLimitMB: 200,
-  })
+  const { t } = useI18n()
+  const [localGeneralConfig, setLocalGeneralConfig] = useState(config?.general || defaultGeneralConfig)
+  const [localAppearanceConfig, setLocalAppearanceConfig] = useState(config?.appearance || defaultAppearanceConfig)
 
   useEffect(() => {
     if (config?.general) {
-      setLocalConfig(config.general)
+      setLocalGeneralConfig(config.general)
+    }
+    if (config?.appearance) {
+      setLocalAppearanceConfig(config.appearance)
     }
   }, [config])
 
-  const handleChange = async (key: string, value: any) => {
+  const handleGeneralChange = async (key: string, value: boolean | number) => {
     if (!config) return
 
-    const newConfig = { ...localConfig, [key]: value }
-    setLocalConfig(newConfig)
+    const newGeneralConfig = { ...localGeneralConfig, [key]: value }
+    setLocalGeneralConfig(newGeneralConfig)
 
     try {
       const updatedConfig = {
         ...config,
-        general: newConfig,
+        general: newGeneralConfig,
       }
       const savedConfig = await window.electronAPI.updateConfig(updatedConfig)
       setConfig(savedConfig)
@@ -34,94 +49,173 @@ export default function GeneralTab() {
     }
   }
 
+  const saveAppearanceConfig = async (appearanceConfig: typeof localAppearanceConfig) => {
+    if (!config) return
+
+    try {
+      const updatedConfig = {
+        ...config,
+        appearance: appearanceConfig,
+      }
+      const savedConfig = await window.electronAPI.updateConfig(updatedConfig)
+      setConfig(savedConfig)
+    } catch (error) {
+      console.error('Failed to update appearance config:', error)
+    }
+  }
+
+  const handleThemeChange = async (theme: 'dark' | 'light') => {
+    const nextAppearanceConfig = {
+      ...localAppearanceConfig,
+      theme,
+    }
+    setLocalAppearanceConfig(nextAppearanceConfig)
+    await saveAppearanceConfig(nextAppearanceConfig)
+  }
+
+  const handleLanguageChange = async (language: LanguageCode) => {
+    const nextAppearanceConfig = {
+      ...localAppearanceConfig,
+      language,
+    }
+    setLocalAppearanceConfig(nextAppearanceConfig)
+    await saveAppearanceConfig(nextAppearanceConfig)
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-[#d4d4d4]">基本设置</h3>
+        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.section.basic')}</h3>
 
-        {/* 开机自启 */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-[#d4d4d4]">开机自启</p>
-            <p className="text-xs text-[#9da0a6]">登录时自动启动 AllRun</p>
+            <p className="text-sm text-[var(--color-text-primary)]">{t('settings.autoStart')}</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.autoStartDesc')}</p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
-              checked={localConfig.autoStart}
-              onChange={(e) => handleChange('autoStart', e.target.checked)}
+              checked={localGeneralConfig.autoStart}
+              onChange={(e) => handleGeneralChange('autoStart', e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-[#3c3c3c] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#0e639c] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[#ffffff] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#ffffff] after:border-[#3c3c3c] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0e639c]"></div>
+            <div className="w-11 h-6 bg-[var(--color-border)] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[var(--color-accent)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[#ffffff] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#ffffff] after:border-[var(--color-border)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--color-accent)]"></div>
           </label>
         </div>
 
-        {/* 历史保留天数 */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-[#d4d4d4]">历史保留天数</p>
-            <p className="text-xs text-[#9da0a6]">超过天数的历史记录将自动清理</p>
+            <p className="text-sm text-[var(--color-text-primary)]">{t('settings.historyRetentionDays')}</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.historyRetentionDaysDesc')}</p>
           </div>
           <input
             type="number"
-            value={localConfig.historyRetentionDays}
-            onChange={(e) => handleChange('historyRetentionDays', parseInt(e.target.value) || 30)}
+            value={localGeneralConfig.historyRetentionDays}
+            onChange={(e) => handleGeneralChange('historyRetentionDays', parseInt(e.target.value) || 30)}
             min={1}
             max={365}
-            className="w-20 px-2 py-1 text-sm text-[#d4d4d4] border border-[#3c3c3c] rounded bg-[#252526] focus:outline-none focus:ring-1 focus:ring-[#0e639c]"
+            className="w-20 px-2 py-1 text-sm text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
           />
         </div>
 
-        {/* 最大历史条数 */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-[#d4d4d4]">最大历史条数</p>
-            <p className="text-xs text-[#9da0a6]">超过数量时清理最旧的记录</p>
+            <p className="text-sm text-[var(--color-text-primary)]">{t('settings.maxHistoryItems')}</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.maxHistoryItemsDesc')}</p>
           </div>
           <input
             type="number"
-            value={localConfig.maxHistoryItems}
-            onChange={(e) => handleChange('maxHistoryItems', parseInt(e.target.value) || 100)}
+            value={localGeneralConfig.maxHistoryItems}
+            onChange={(e) => handleGeneralChange('maxHistoryItems', parseInt(e.target.value) || 100)}
             min={10}
             max={1000}
-            className="w-20 px-2 py-1 text-sm text-[#d4d4d4] border border-[#3c3c3c] rounded bg-[#252526] focus:outline-none focus:ring-1 focus:ring-[#0e639c]"
+            className="w-20 px-2 py-1 text-sm text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
           />
         </div>
 
-        {/* 图片存储上限 */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-[#d4d4d4]">图片存储上限 (MB)</p>
-            <p className="text-xs text-[#9da0a6]">超过上限时清理最旧的图片</p>
+            <p className="text-sm text-[var(--color-text-primary)]">{t('settings.imageStorageLimit')}</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.imageStorageLimitDesc')}</p>
           </div>
           <input
             type="number"
-            value={localConfig.imageStorageLimitMB}
-            onChange={(e) => handleChange('imageStorageLimitMB', parseInt(e.target.value) || 200)}
+            value={localGeneralConfig.imageStorageLimitMB}
+            onChange={(e) => handleGeneralChange('imageStorageLimitMB', parseInt(e.target.value) || 200)}
             min={50}
             max={2000}
-            className="w-20 px-2 py-1 text-sm text-[#d4d4d4] border border-[#3c3c3c] rounded bg-[#252526] focus:outline-none focus:ring-1 focus:ring-[#0e639c]"
+            className="w-20 px-2 py-1 text-sm text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
           />
         </div>
       </div>
 
-      {/* 数据管理 */}
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-[#d4d4d4]">数据管理</h3>
+        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.section.appearance')}</h3>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-[var(--color-text-primary)]">{t('settings.theme')}</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.themeDesc')}</p>
+          </div>
+          <select
+            value={localAppearanceConfig.theme}
+            onChange={(e) => handleThemeChange(e.target.value as 'dark' | 'light')}
+            className="w-28 px-2 py-1 text-sm text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+          >
+            <option value="dark">{t('settings.themeDark')}</option>
+            <option value="light">{t('settings.themeLight')}</option>
+          </select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-[var(--color-text-primary)]">{t('settings.language')}</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.languageDesc')}</p>
+          </div>
+          <select
+            value={localAppearanceConfig.language}
+            onChange={(e) => handleLanguageChange(e.target.value as LanguageCode)}
+            className="w-36 px-2 py-1 text-sm text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+          >
+            {languageOptions.map((item) => (
+              <option key={item.code} value={item.code}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.resizeTip')}</p>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.section.data')}</h3>
 
         <div className="flex gap-2">
           <button
             onClick={async () => {
-              if (confirm('确定要清空所有历史记录吗？收藏的内容不会被删除。')) {
+              if (confirm(t('settings.clearHistoryConfirm'))) {
                 await window.electronAPI.clearHistory()
-                // 刷新历史记录
                 const history = await window.electronAPI.getHistory()
                 useStore.getState().setHistory(history)
               }
             }}
-            className="px-3 py-1.5 text-sm text-[#f48771] border border-[#6b2f2b] rounded hover:bg-[#3a1f1c]"
+            className="px-3 py-1.5 text-sm text-[var(--color-danger)] border border-[var(--color-danger-border)] rounded hover:bg-[var(--color-danger-hover-bg)]"
           >
-            清空历史记录
+            {t('settings.clearHistory')}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.section.system')}</h3>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.quitAppDesc')}</p>
+          <button
+            onClick={() => window.electronAPI.quitApp()}
+            className="px-3 py-1.5 text-sm text-white bg-[var(--color-danger)] rounded hover:brightness-95"
+          >
+            {t('settings.quitApp')}
           </button>
         </div>
       </div>

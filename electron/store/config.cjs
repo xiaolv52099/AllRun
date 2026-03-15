@@ -7,6 +7,10 @@ const DEFAULT_CONFIG = {
     width: 500,
     height: 600
   },
+  settingsWindow: {
+    width: 860,
+    height: 680
+  },
   shortcuts: {
     toggleWindow: 'CommandOrControl+1',
     openSettings: 'CommandOrControl+,'
@@ -16,6 +20,38 @@ const DEFAULT_CONFIG = {
     historyRetentionDays: 30,
     maxHistoryItems: 100,
     imageStorageLimitMB: 200
+  },
+  appearance: {
+    theme: 'dark',
+    settingsZoom: 100,
+    language: 'zh-CN'
+  }
+}
+
+function mergeConfig(config = {}) {
+  return {
+    ...DEFAULT_CONFIG,
+    ...config,
+    window: {
+      ...DEFAULT_CONFIG.window,
+      ...config.window,
+    },
+    settingsWindow: {
+      ...DEFAULT_CONFIG.settingsWindow,
+      ...config.settingsWindow,
+    },
+    shortcuts: {
+      ...DEFAULT_CONFIG.shortcuts,
+      ...config.shortcuts,
+    },
+    general: {
+      ...DEFAULT_CONFIG.general,
+      ...config.general,
+    },
+    appearance: {
+      ...DEFAULT_CONFIG.appearance,
+      ...config.appearance,
+    },
   }
 }
 
@@ -30,12 +66,12 @@ class ConfigStore {
     try {
       if (fs.existsSync(this.filePath)) {
         const data = fs.readFileSync(this.filePath, 'utf-8')
-        return { ...DEFAULT_CONFIG, ...JSON.parse(data) }
+        return mergeConfig(JSON.parse(data))
       }
     } catch (error) {
       console.error('Failed to load config:', error)
     }
-    return { ...DEFAULT_CONFIG }
+    return mergeConfig()
   }
 
   save() {
@@ -51,16 +87,44 @@ class ConfigStore {
   }
 
   getConfig() {
-    return { ...this.config }
+    return mergeConfig(this.config)
   }
 
   updateConfig(config) {
-    this.config = { ...this.config, ...config }
+    this.config = mergeConfig({
+      ...this.config,
+      ...config,
+      window: {
+        ...this.config.window,
+        ...config.window,
+      },
+      settingsWindow: {
+        ...this.config.settingsWindow,
+        ...config.settingsWindow,
+      },
+      shortcuts: {
+        ...this.config.shortcuts,
+        ...config.shortcuts,
+      },
+      general: {
+        ...this.config.general,
+        ...config.general,
+      },
+      appearance: {
+        ...this.config.appearance,
+        ...config.appearance,
+      },
+    })
     this.save()
   }
 
   updateWindowSettings(window) {
     this.config.window = { ...this.config.window, ...window }
+    this.save()
+  }
+
+  updateSettingsWindowSettings(window) {
+    this.config.settingsWindow = { ...this.config.settingsWindow, ...window }
     this.save()
   }
 

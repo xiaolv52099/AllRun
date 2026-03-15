@@ -1,38 +1,125 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
+import { X, Settings2 } from 'lucide-react'
 import SearchBar from './components/SearchBar'
 import TabBar from './components/TabBar'
 import HistoryList from './components/HistoryList'
 import CommandsList from './components/CommandsList'
 import Settings from './components/Settings'
 import { useStore } from './stores/useStore'
-import { TabType } from './types'
-import { X, Settings2 } from 'lucide-react'
+import { TabType, Command } from './types'
+import { useI18n } from './hooks/useI18n'
 
 const tabOrder: TabType[] = ['all', 'text', 'image', 'favorites', 'commands']
+
+function detectSettingsView() {
+  if (typeof window === 'undefined') return false
+  const query = new URLSearchParams(window.location.search)
+  return query.get('view') === 'settings'
+}
 
 function App() {
   const {
     activeTab,
-    showSettings,
-    setShowSettings,
+    config,
+    setConfig,
     setActiveTab,
     setCommands,
     setSearchQuery,
     setSelectedIndex,
   } = useStore()
+  const { t } = useI18n()
   const hasElectronAPI = typeof window !== 'undefined' && 'electronAPI' in window
+  const isSettingsView = useMemo(() => detectSettingsView(), [])
 
+  useEffect(() => {
+    const currentTheme = config?.appearance?.theme || 'dark'
+    document.documentElement.setAttribute('data-theme', currentTheme)
+  }, [config?.appearance?.theme])
+
+  useEffect(() => {
+    const language = config?.appearance?.language || 'zh-CN'
+    document.documentElement.setAttribute('lang', language)
+  }, [config?.appearance?.language])
+
+  useEffect(() => {
+    if (!hasElectronAPI) return
+
+    const loadConfig = async () => {
+      try {
+        const latestConfig = await window.electronAPI.getConfig()
+        setConfig(latestConfig)
+      } catch (error) {
+        console.error('Failed to load config in app:', error)
+      }
+    }
+
+    loadConfig()
+    return window.electronAPI.onConfigUpdated((nextConfig) => {
+      setConfig(nextConfig)
+    })
+  }, [hasElectronAPI, setConfig])
+
+  if (!hasElectronAPI) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
+        <div className="max-w-xl text-center space-y-3">
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('browser.onlyElectronTitle')}</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            {t('browser.onlyElectronDesc1')}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {t('browser.onlyElectronDesc2')}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isSettingsView) {
+    return <Settings />
+  }
+
+  return (
+    <MainWindow
+      activeTab={activeTab}
+      hasElectronAPI={hasElectronAPI}
+      setActiveTab={setActiveTab}
+      setCommands={setCommands}
+      setSearchQuery={setSearchQuery}
+      setSelectedIndex={setSelectedIndex}
+      t={t}
+    />
+  )
+}
+
+function MainWindow({
+  activeTab,
+  hasElectronAPI,
+  setActiveTab,
+  setCommands,
+  setSearchQuery,
+  setSelectedIndex,
+  t,
+}: {
+  activeTab: TabType
+  hasElectronAPI: boolean
+  setActiveTab: (tab: TabType) => void
+  setCommands: (commands: Command[]) => void
+  setSearchQuery: (query: string) => void
+  setSelectedIndex: (index: number) => void
+  t: (key: string, vars?: Record<string, string | number>) => string
+}) {
   // 监听设置快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault()
-        setShowSettings(!showSettings)
+        window.electronAPI.openSettingsWindow()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showSettings, setShowSettings])
+  }, [])
 
   // 监听主进程快捷键事件
   useEffect(() => {
@@ -40,10 +127,10 @@ function App() {
 
     return window.electronAPI.onShortcutTriggered((action) => {
       if (action === 'openSettings') {
-        setShowSettings(true)
+        window.electronAPI.openSettingsWindow()
       }
     })
-  }, [hasElectronAPI, setShowSettings])
+  }, [hasElectronAPI])
 
   // 全局加载快捷指令，供“全部”搜索联动
   useEffect(() => {
@@ -64,8 +151,6 @@ function App() {
   // Tab 左右键切换
   useEffect(() => {
     const handleTabSwitch = (e: KeyboardEvent) => {
-      if (showSettings) return
-
       const target = e.target as HTMLElement | null
       const isSearchInput = target instanceof HTMLInputElement && target.id === 'search-input'
       const isInputLike =
@@ -97,11 +182,7 @@ function App() {
 
     window.addEventListener('keydown', handleTabSwitch)
     return () => window.removeEventListener('keydown', handleTabSwitch)
-  }, [activeTab, setActiveTab, setSearchQuery, showSettings])
-
-  useEffect(() => {
-    document.documentElement.classList.add('dark')
-  }, [])
+  }, [activeTab, setActiveTab, setSearchQuery])
 
   // 每次窗口打开时，重置搜索和 Tab
   useEffect(() => {
@@ -114,69 +195,39 @@ function App() {
     })
   }, [hasElectronAPI, setActiveTab, setSearchQuery, setSelectedIndex])
 
-  if (!hasElectronAPI) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
-        <div className="max-w-xl text-center space-y-3">
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">请在 Electron 中调试 AllRun</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            当前是浏览器预览页面，桌面能力（剪贴板监听、全局快捷键、自动粘贴）不可用。
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            在终端运行 `npm run dev`，并操作弹出的桌面窗口；不要直接访问 `http://localhost:5173`。
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="h-screen flex flex-col bg-[#1e1e1e] text-[#d4d4d4]">
-      {/* 标题栏拖拽区域 */}
-      <div className="drag-region relative h-8 bg-[#252526] border-b border-[#3c3c3c]">
+    <div className="h-screen flex flex-col bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
+      <div className="drag-region relative h-8 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
         <div className="absolute left-2 inset-y-0 flex items-center">
           <button
             onClick={() => window.electronAPI.hideWindow()}
             className="no-drag w-3 h-3 rounded-full bg-[#ff5f57] flex items-center justify-center hover:brightness-110 transition"
-            title="关闭"
+            title={t('window.close')}
           >
             <X className="w-2 h-2 text-black/80" strokeWidth={2.5} />
           </button>
         </div>
         <div className="absolute right-2 inset-y-0 flex items-center">
           <button
-            onClick={() => setShowSettings(true)}
-            className="no-drag p-1 rounded hover:bg-[#2a2d2e] transition-colors"
-            title="设置"
+            onClick={() => window.electronAPI.openSettingsWindow()}
+            className="no-drag p-1 rounded hover:bg-[var(--color-bg-hover)] transition-colors"
+            title={t('window.settings')}
           >
-            <Settings2 className="w-3.5 h-3.5 text-[#c5c5c5]" />
+            <Settings2 className="w-3.5 h-3.5 text-[var(--color-title)]" />
           </button>
         </div>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-xs text-[#c5c5c5] font-medium">AllRun</span>
+          <span className="text-xs text-[var(--color-title)] font-medium">{t('app.name')}</span>
         </div>
       </div>
 
-      {/* 主内容区域 */}
       <div className="flex-1 flex flex-col overflow-hidden no-drag">
-        {/* 搜索栏 */}
         <SearchBar />
-
-        {/* Tab 导航 */}
         <TabBar />
-
-        {/* 内容区域 */}
         <div className="flex-1 overflow-hidden">
-          {activeTab === 'commands' ? (
-            <CommandsList />
-          ) : (
-            <HistoryList />
-          )}
+          {activeTab === 'commands' ? <CommandsList /> : <HistoryList />}
         </div>
       </div>
-
-      {/* 设置弹窗 */}
-      {showSettings && <Settings />}
     </div>
   )
 }

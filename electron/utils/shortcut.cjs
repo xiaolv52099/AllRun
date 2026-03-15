@@ -15,10 +15,14 @@ async function toggleWindow(mainWindow, hooks) {
 }
 
 async function openSettings(mainWindow, hooks) {
-  if (!mainWindow || mainWindow.isDestroyed()) {
+  if (typeof hooks.openSettingsWindow === 'function') {
+    await hooks.openSettingsWindow()
     return
   }
 
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return
+  }
   await hooks.beforeShow?.()
   mainWindow.show()
   mainWindow.focus()

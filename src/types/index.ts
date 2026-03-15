@@ -29,6 +29,7 @@ export interface Command {
   path?: string
   url?: string
   command?: string
+  bashParams?: string
   shortcut?: string
   icon?: string
   description?: string
@@ -36,6 +37,10 @@ export interface Command {
 
 export interface AppConfig {
   window: {
+    width: number
+    height: number
+  }
+  settingsWindow: {
     width: number
     height: number
   }
@@ -48,6 +53,11 @@ export interface AppConfig {
     historyRetentionDays: number
     maxHistoryItems: number
     imageStorageLimitMB: number
+  }
+  appearance: {
+    theme: 'dark' | 'light'
+    settingsZoom: number
+    language: 'zh-CN' | 'zh-TW' | 'en-US' | 'ko-KR' | 'ja-JP'
   }
 }
 
@@ -76,7 +86,14 @@ export interface ElectronAPI {
   addCommand: (command: Omit<Command, 'id'>) => Promise<Command>
   updateCommand: (id: string, command: Partial<Command>) => Promise<Command | undefined>
   deleteCommand: (id: string) => Promise<boolean>
-  executeCommand: (id: string, params?: Record<string, string>) => Promise<unknown>
+  executeCommand: (
+    id: string,
+    params?: Record<string, unknown> & {
+      commandArgs?: string[]
+      commandNamedArgs?: Record<string, string>
+      rawInput?: string
+    }
+  ) => Promise<unknown>
 
   readClipboard: () => Promise<ClipboardContent>
   writeClipboard: (text: string) => Promise<boolean>
@@ -86,8 +103,12 @@ export interface ElectronAPI {
   hideWindow: () => Promise<void>
   showWindow: () => Promise<void>
   toggleWindow: () => Promise<void>
+  openSettingsWindow: () => Promise<boolean>
+  closeSettingsWindow: () => Promise<boolean>
+  quitApp: () => Promise<boolean>
 
   onClipboardChange: (callback: (item: HistoryItem) => void) => () => void
   onShortcutTriggered: (callback: (action: string) => void) => () => void
   onWindowOpened: (callback: () => void) => () => void
+  onConfigUpdated: (callback: (config: AppConfig) => void) => () => void
 }

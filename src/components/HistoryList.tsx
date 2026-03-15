@@ -5,6 +5,9 @@ import { Play, Trash2, X, Copy } from 'lucide-react'
 import { useStore } from '../stores/useStore'
 import HistoryItemComponent from './HistoryItem'
 import { Command, HistoryItem } from '../types'
+import CommandParamsDialog from './CommandParamsDialog'
+import { parseCommandParamInput, parseCommandParamNames } from '../utils/commandParams'
+import { useI18n } from '../hooks/useI18n'
 
 const historyFuseOptions = {
   keys: ['content', 'remark', 'metadata.fileName'],
@@ -72,9 +75,14 @@ export default function HistoryList() {
     isLoading,
     setIsLoading,
   } = useStore()
+  const { t } = useI18n()
 
   const listRef = useRef<List>(null)
   const [previewImage, setPreviewImage] = useState<HistoryItem | null>(null)
+  const [paramDialogState, setParamDialogState] = useState<{
+    command: Command
+    paramNames: string[]
+  } | null>(null)
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -182,24 +190,57 @@ export default function HistoryList() {
     }
   }, [])
 
-  const handleExecuteCommand = useCallback(async (command: Command) => {
+  const runCommand = useCallback(async (
+    command: Command,
+    params?: {
+      commandArgs?: string[]
+      commandNamedArgs?: Record<string, string>
+      rawInput?: string
+    }
+  ) => {
     try {
-      await window.electronAPI.executeCommand(command.id)
+      await window.electronAPI.executeCommand(command.id, params)
       await window.electronAPI.hideWindow()
+      return true
     } catch (error) {
       console.error('Failed to execute command from search:', error)
-      alert(`执行失败: ${(error as Error).message}`)
+      alert(t('error.executeFailed', { message: (error as Error).message }))
+      return false
     }
-  }, [])
+  }, [t])
+
+  const handleExecuteCommand = useCallback(async (command: Command) => {
+    const paramNames = parseCommandParamNames(command.bashParams)
+    if (command.type === 'shell' && paramNames.length > 0) {
+      setParamDialogState({ command, paramNames })
+      return
+    }
+    await runCommand(command)
+  }, [runCommand])
+
+  const handleConfirmParams = useCallback(async (input: string) => {
+    if (!paramDialogState) return
+
+    const parsed = parseCommandParamInput(input, paramDialogState.paramNames)
+    const succeeded = await runCommand(paramDialogState.command, {
+      rawInput: input,
+      commandArgs: parsed.orderedArgs,
+      commandNamedArgs: parsed.namedArgs,
+    })
+
+    if (succeeded) {
+      setParamDialogState(null)
+    }
+  }, [paramDialogState, runCommand])
 
   const handleDeleteCommand = useCallback(async (id: string) => {
-    if (!confirm('确定要删除这个指令吗？')) {
+    if (!confirm(t('commands.deleteConfirm'))) {
       return
     }
     await window.electronAPI.deleteCommand(id)
     const currentCommands = useStore.getState().commands
     setCommands(currentCommands.filter((command) => command.id !== id))
-  }, [setCommands])
+  }, [setCommands, t])
 
   const handleActivate = useCallback(async (entry: ListEntry) => {
     if (entry.kind === 'history') {
@@ -214,6 +255,7 @@ export default function HistoryList() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (paramDialogState) return
       if (items.length === 0) return
 
       const target = e.target as HTMLElement | null
@@ -245,7 +287,7 @@ export default function HistoryList() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTab, handleActivate, items, selectedIndex, setSelectedIndex])
+  }, [activeTab, handleActivate, items, paramDialogState, selectedIndex, setSelectedIndex])
 
   useEffect(() => {
     if (listRef.current) {
@@ -315,20 +357,20 @@ export default function HistoryList() {
               setSelectedIndex(index)
               handleExecuteCommand(command)
             }}
-            className={`group h-full px-3 py-1.5 cursor-pointer border-b border-[#2d2d30] transition-colors ${
+            className={`group h-full px-3 py-1.5 cursor-pointer border-b border-[var(--color-border-muted)] transition-colors ${
               index === selectedIndex
-                ? 'bg-[#04395e]'
-                : 'hover:bg-[#2a2d2e]'
+                ? 'bg-[var(--color-selected)]'
+                : 'hover:bg-[var(--color-bg-hover)]'
             }`}
           >
             <div className="flex items-center justify-between h-full">
               <div className="flex items-center gap-3">
                 <span className="text-lg">{getCommandIcon(command.type)}</span>
                 <div>
-                  <p className="text-sm font-medium text-[#d4d4d4]">
+                  <p className="text-sm font-medium text-[var(--color-text-primary)]">
                     {highlightKeyword(command.name, searchQuery)}
                   </p>
-                  <p className="text-xs text-[#9da0a6]">
+                  <p className="text-xs text-[var(--color-text-secondary)]">
                     {command.description || command.path || command.url || command.command}
                   </p>
                 </div>
@@ -340,20 +382,20 @@ export default function HistoryList() {
                     e.stopPropagation()
                     handleExecuteCommand(command)
                   }}
-                  className="p-1.5 rounded hover:bg-[#3c3c3c]"
-                  title="执行"
+                  className="p-1.5 rounded hover:bg-[var(--color-border)]"
+                  title={t('common.execute')}
                 >
-                  <Play className="w-4 h-4 text-[#9da0a6]" />
+                  <Play className="w-4 h-4 text-[var(--color-text-secondary)]" />
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
                     handleDeleteCommand(command.id)
                   }}
-                  className="p-1.5 rounded hover:bg-[#3c3c3c]"
-                  title="删除"
+                  className="p-1.5 rounded hover:bg-[var(--color-border)]"
+                  title={t('common.delete')}
                 >
-                  <Trash2 className="w-4 h-4 text-[#9da0a6]" />
+                  <Trash2 className="w-4 h-4 text-[var(--color-text-secondary)]" />
                 </button>
               </div>
             </div>
@@ -373,13 +415,14 @@ export default function HistoryList() {
       searchQuery,
       selectedIndex,
       setSelectedIndex,
+      t,
     ]
   )
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-[#9da0a6]">加载中...</p>
+        <p className="text-[var(--color-text-secondary)]">{t('common.loading')}</p>
       </div>
     )
   }
@@ -387,8 +430,8 @@ export default function HistoryList() {
   if (items.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-[#9da0a6]">
-          {searchQuery ? '没有找到匹配的内容或指令' : '暂无历史记录'}
+        <p className="text-[var(--color-text-secondary)]">
+          {searchQuery ? t('history.noMatch') : t('history.noData')}
         </p>
       </div>
     )
@@ -408,37 +451,46 @@ export default function HistoryList() {
 
       {previewImage && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
-          <div className="bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg w-full max-w-3xl max-h-full overflow-auto">
-            <div className="flex items-center justify-between p-3 border-b border-[#2d2d30]">
-              <span className="text-sm text-[#d4d4d4]">图片预览</span>
+          <div className="bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg w-full max-w-3xl max-h-full overflow-auto">
+            <div className="flex items-center justify-between p-3 border-b border-[var(--color-border-muted)]">
+              <span className="text-sm text-[var(--color-text-primary)]">{t('history.previewImage')}</span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={async () => {
                     await window.electronAPI.writeImageClipboard(previewImage.content)
                   }}
-                  className="p-1.5 rounded hover:bg-[#3c3c3c]"
-                  title="复制图片"
+                  className="p-1.5 rounded hover:bg-[var(--color-border)]"
+                  title={t('history.copyImage')}
                 >
-                  <Copy className="w-4 h-4 text-[#9da0a6]" />
+                  <Copy className="w-4 h-4 text-[var(--color-text-secondary)]" />
                 </button>
                 <button
                   onClick={() => setPreviewImage(null)}
-                  className="p-1.5 rounded hover:bg-[#3c3c3c]"
-                  title="关闭预览"
+                  className="p-1.5 rounded hover:bg-[var(--color-border)]"
+                  title={t('window.close')}
                 >
-                  <X className="w-4 h-4 text-[#9da0a6]" />
+                  <X className="w-4 h-4 text-[var(--color-text-secondary)]" />
                 </button>
               </div>
             </div>
             <div className="p-4 flex items-center justify-center">
               <img
                 src={previewImage.content}
-                alt="预览图片"
+                alt={t('history.imageAlt')}
                 className="max-w-full max-h-[70vh] object-contain rounded"
               />
             </div>
           </div>
         </div>
+      )}
+
+      {paramDialogState && (
+        <CommandParamsDialog
+          commandName={paramDialogState.command.name}
+          paramNames={paramDialogState.paramNames}
+          onCancel={() => setParamDialogState(null)}
+          onConfirm={handleConfirmParams}
+        />
       )}
     </>
   )

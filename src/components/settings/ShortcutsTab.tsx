@@ -1,30 +1,32 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../../stores/useStore'
 import { AppConfig } from '../../types'
+import { useI18n } from '../../hooks/useI18n'
 
 type ShortcutKey = keyof AppConfig['shortcuts']
 
 interface ShortcutItem {
   key: ShortcutKey
-  label: string
-  description: string
+  labelKey: string
+  descriptionKey: string
 }
 
 const shortcutItems: ShortcutItem[] = [
   {
     key: 'toggleWindow',
-    label: '显示/隐藏窗口',
-    description: '快速唤起或隐藏主窗口',
+    labelKey: 'shortcuts.toggleWindow',
+    descriptionKey: 'shortcuts.toggleWindowDesc',
   },
   {
     key: 'openSettings',
-    label: '打开设置',
-    description: '打开设置弹窗',
+    labelKey: 'shortcuts.openSettings',
+    descriptionKey: 'shortcuts.openSettingsDesc',
   },
 ]
 
 export default function ShortcutsTab() {
   const { config, setConfig } = useStore()
+  const { t } = useI18n()
   const [editingKey, setEditingKey] = useState<ShortcutKey | null>(null)
   const [tempShortcut, setTempShortcut] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -72,7 +74,7 @@ export default function ShortcutsTab() {
         setEditingKey(null)
       } catch (error) {
         console.error('Failed to update shortcut:', error)
-        alert('快捷键设置失败，可能与其他快捷键冲突')
+        alert(t('shortcuts.updateFailed'))
       }
     }
   }
@@ -85,27 +87,27 @@ export default function ShortcutsTab() {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-[#d4d4d4]">快捷键设置</h3>
+      <h3 className="text-sm font-medium text-[var(--color-text-primary)]">{t('shortcuts.title')}</h3>
 
       <div className="space-y-3">
         {shortcutItems.map((item) => (
           <div
             key={item.key}
-            className="flex items-center justify-between p-3 bg-[#252526] border border-[#3c3c3c] rounded-lg"
+            className="flex items-center justify-between p-3 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg"
           >
             <div>
-              <p className="text-sm text-[#d4d4d4]">{item.label}</p>
-              <p className="text-xs text-[#9da0a6]">{item.description}</p>
+              <p className="text-sm text-[var(--color-text-primary)]">{t(item.labelKey)}</p>
+              <p className="text-xs text-[var(--color-text-secondary)]">{t(item.descriptionKey)}</p>
             </div>
 
             {editingKey === item.key ? (
               <input
                 ref={inputRef}
                 type="text"
-                value={tempShortcut || '请按下快捷键组合...'}
+                value={tempShortcut || t('shortcuts.capturePlaceholder')}
                 onKeyDown={(e) => handleKeyCapture(e, item.key)}
                 onBlur={() => setEditingKey(null)}
-                className="w-32 px-2 py-1 text-sm text-center text-[#d4d4d4] border border-[#0e639c] rounded bg-[#1e1e1e] focus:outline-none"
+                className="w-32 px-2 py-1 text-sm text-center text-[var(--color-text-primary)] border border-[var(--color-accent)] rounded bg-[var(--color-bg-primary)] focus:outline-none"
                 readOnly
               />
             ) : (
@@ -114,7 +116,7 @@ export default function ShortcutsTab() {
                   setEditingKey(item.key)
                   setTempShortcut('')
                 }}
-                className="px-3 py-1 text-sm font-mono text-[#d4d4d4] bg-[#1e1e1e] border border-[#3c3c3c] rounded hover:border-[#0e639c] transition-colors"
+                className="px-3 py-1 text-sm font-mono text-[var(--color-text-primary)] bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded hover:border-[var(--color-accent)] transition-colors"
               >
                 {formatShortcut(config?.shortcuts?.[item.key] || '')}
               </button>
@@ -123,8 +125,8 @@ export default function ShortcutsTab() {
         ))}
       </div>
 
-      <p className="text-xs text-[#9da0a6]">
-        点击快捷键区域，然后按下新的快捷键组合即可修改
+      <p className="text-xs text-[var(--color-text-secondary)]">
+        {t('shortcuts.pressHint')}
       </p>
     </div>
   )

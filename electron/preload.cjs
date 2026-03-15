@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   hideWindow: () => ipcRenderer.invoke('hide-window'),
   showWindow: () => ipcRenderer.invoke('show-window'),
   toggleWindow: () => ipcRenderer.invoke('toggle-window'),
+  openSettingsWindow: () => ipcRenderer.invoke('open-settings-window'),
+  closeSettingsWindow: () => ipcRenderer.invoke('close-settings-window'),
+  quitApp: () => ipcRenderer.invoke('quit-app'),
 
   // 事件监听
   onClipboardChange: (callback) => {
@@ -49,5 +52,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const listener = () => callback()
     ipcRenderer.on('window-opened', listener)
     return () => ipcRenderer.removeListener('window-opened', listener)
+  },
+  onConfigUpdated: (callback) => {
+    const listener = (_event, config) => callback(config)
+    ipcRenderer.on('config-updated', listener)
+    return () => ipcRenderer.removeListener('config-updated', listener)
   }
 })

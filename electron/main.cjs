@@ -13,6 +13,7 @@ const shortcutUtils = require('./utils/shortcut.cjs')
 const autoStartUtils = require('./utils/autoStart.cjs')
 
 let mainWindow = null
+let settingsWindow = null
 let clipboardWatcher = null
 
 // 存储模块
@@ -22,6 +23,15 @@ let configStore
 let commandsStore
 let commandExecutor
 let lastFrontmostAppPid = null
+
+function broadcastToWindows(channel, payload) {
+  const targets = [mainWindow, settingsWindow]
+  targets.forEach((win) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(channel, payload)
+    }
+  })
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -143,6 +153,67 @@ function createWindow() {
   })
 }
 
+function createSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    if (settingsWindow.isMinimized()) {
+      settingsWindow.restore()
+    }
+    settingsWindow.show()
+    settingsWindow.focus()
+    return settingsWindow
+  }
+
+  const config = configStore.getConfig()
+  const { width, height } = config.settingsWindow
+
+  settingsWindow = new BrowserWindow({
+    width,
+    height,
+    minWidth: 560,
+    minHeight: 420,
+    show: false,
+    frame: false,
+    transparent: false,
+    vibrancy: 'under-window',
+    visualEffectState: 'active',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  })
+
+  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+    settingsWindow.loadURL('http://localhost:5173/?view=settings')
+  } else {
+    settingsWindow.loadFile(path.join(__dirname, '../dist/index.html'), {
+      query: { view: 'settings' },
+    })
+  }
+
+  settingsWindow.once('ready-to-show', () => {
+    settingsWindow?.show()
+    settingsWindow?.focus()
+  })
+
+  settingsWindow.on('resize', () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      const [w, h] = settingsWindow.getSize()
+      configStore.updateSettingsWindowSettings({ width: w, height: h })
+    }
+  })
+
+  settingsWindow.on('closed', () => {
+    settingsWindow = null
+  })
+
+  return settingsWindow
+}
+
+function openSettingsWindow() {
+  return createSettingsWindow()
+}
+
 function setupIPCHandlers() {
   ipcMain.handle('get-history', async () => {
     return historyStore.getAll()
@@ -185,6 +256,7 @@ function setupIPCHandlers() {
   ipcMain.handle('update-config', async (_, config) => {
     configStore.updateConfig(config)
     const latest = configStore.getConfig()
+    broadcastToWindows('config-updated', latest)
 
     historyStore.setMaxItems(latest.general.maxHistoryItems)
     autoStartUtils.setAutoStart(Boolean(latest.general.autoStart))
@@ -192,6 +264,7 @@ function setupIPCHandlers() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       shortcutUtils.setupShortcuts(mainWindow, configStore, {
         beforeShow: captureFrontmostApplication,
+        openSettingsWindow,
       })
     }
 
@@ -293,6 +366,24 @@ function setupIPCHandlers() {
       mainWindow.focus()
     }
   })
+
+  ipcMain.handle('open-settings-window', async () => {
+    openSettingsWindow()
+    return true
+  })
+
+  ipcMain.handle('close-settings-window', async () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.close()
+    }
+    return true
+  })
+
+  ipcMain.handle('quit-app', async () => {
+    app.isQuitting = true
+    app.quit()
+    return true
+  })
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
@@ -330,6 +421,7 @@ if (!gotSingleInstanceLock) {
     autoStartUtils.setAutoStart(Boolean(initialConfig.general.autoStart))
     shortcutUtils.setupShortcuts(mainWindow, configStore, {
       beforeShow: captureFrontmostApplication,
+      openSettingsWindow,
     })
 
     clipboardWatcher = new ClipboardWatcher(historyStore, (item) => {
@@ -340,7 +432,7 @@ if (!gotSingleInstanceLock) {
     clipboardWatcher.start()
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
+      if (!mainWindow || mainWindow.isDestroyed()) {
         createWindow()
       } else {
         mainWindow?.show()
@@ -365,4 +457,4 @@ if (process.platform === 'darwin') {
   app.dock?.hide()
 }
 
-module.exports = { mainWindow, historyStore, favoritesStore, configStore, commandsStore }
+module.exports = { mainWindow, settingsWindow, historyStore, favoritesStore, configStore, commandsStore }

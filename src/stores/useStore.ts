@@ -18,10 +18,6 @@ interface StoreState {
   selectedIndex: number
   setSelectedIndex: (index: number) => void
 
-  // 设置弹窗
-  showSettings: boolean
-  setShowSettings: (show: boolean) => void
-
   // 配置
   config: AppConfig | null
   setConfig: (config: AppConfig) => void
@@ -51,10 +47,6 @@ export const useStore = create<StoreState>((set) => ({
   // 选中项
   selectedIndex: 0,
   setSelectedIndex: (selectedIndex) => set({ selectedIndex }),
-
-  // 设置弹窗
-  showSettings: false,
-  setShowSettings: (showSettings) => set({ showSettings }),
 
   // 配置
   config: null,
