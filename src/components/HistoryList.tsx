@@ -305,7 +305,7 @@ export default function HistoryList() {
         setSelectedIndex(selectedIndex >= items.length - 1 ? 0 : selectedIndex + 1)
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setSelectedIndex(Math.max(selectedIndex - 1, 0))
+        setSelectedIndex(selectedIndex <= 0 ? items.length - 1 : selectedIndex - 1)
       } else if (e.key === 'Enter' && items[selectedIndex]) {
         if (activeTab === 'image') {
           e.preventDefault()

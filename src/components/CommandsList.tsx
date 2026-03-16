@@ -151,7 +151,7 @@ export default function CommandsList() {
         setSelectedIndex(selectedIndex >= filteredCommands.length - 1 ? 0 : selectedIndex + 1)
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setSelectedIndex(Math.max(selectedIndex - 1, 0))
+        setSelectedIndex(selectedIndex <= 0 ? filteredCommands.length - 1 : selectedIndex - 1)
       } else if (e.key === 'Enter' && filteredCommands[selectedIndex]) {
         e.preventDefault()
         handleExecute(filteredCommands[selectedIndex])
