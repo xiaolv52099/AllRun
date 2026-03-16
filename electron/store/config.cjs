@@ -2,6 +2,8 @@ const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
+const DEFAULT_TAB_ORDER = ['all', 'commands', 'text', 'favorites', 'image']
+
 const DEFAULT_CONFIG = {
   window: {
     width: 500,
@@ -24,11 +26,57 @@ const DEFAULT_CONFIG = {
   appearance: {
     theme: 'dark',
     settingsZoom: 100,
-    language: 'zh-CN'
+    language: 'zh-CN',
+    tabOrder: [...DEFAULT_TAB_ORDER],
+    favoriteOrder: [],
   }
 }
 
+function normalizeTabOrder(order) {
+  const source = Array.isArray(order) ? order : []
+  const seen = new Set()
+  const result = []
+
+  source.forEach((item) => {
+    if (DEFAULT_TAB_ORDER.includes(item) && !seen.has(item)) {
+      seen.add(item)
+      result.push(item)
+    }
+  })
+
+  DEFAULT_TAB_ORDER.forEach((item) => {
+    if (!seen.has(item)) {
+      seen.add(item)
+      result.push(item)
+    }
+  })
+
+  return result
+}
+
+function normalizeFavoriteOrder(order) {
+  if (!Array.isArray(order)) {
+    return []
+  }
+
+  const seen = new Set()
+  const result = []
+  order.forEach((item) => {
+    if (typeof item !== 'string' || !item || seen.has(item)) {
+      return
+    }
+    seen.add(item)
+    result.push(item)
+  })
+  return result
+}
+
 function mergeConfig(config = {}) {
+  const appearance = {
+    ...DEFAULT_CONFIG.appearance,
+    ...config.appearance,
+  }
+
   return {
     ...DEFAULT_CONFIG,
     ...config,
@@ -49,8 +97,9 @@ function mergeConfig(config = {}) {
       ...config.general,
     },
     appearance: {
-      ...DEFAULT_CONFIG.appearance,
-      ...config.appearance,
+      ...appearance,
+      tabOrder: normalizeTabOrder(appearance.tabOrder),
+      favoriteOrder: normalizeFavoriteOrder(appearance.favoriteOrder),
     },
   }
 }

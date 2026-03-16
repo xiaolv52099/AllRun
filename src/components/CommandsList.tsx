@@ -46,11 +46,13 @@ export default function CommandsList() {
   } = useStore()
   const { t } = useI18n()
   const [executingId, setExecutingId] = useState<string | null>(null)
+  const [draggingCommandId, setDraggingCommandId] = useState<string | null>(null)
   const [paramDialogState, setParamDialogState] = useState<{
     command: Command
     paramNames: string[]
   } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const isDragEnabled = !searchQuery.trim()
 
   // 加载快捷指令
   useEffect(() => {
@@ -185,6 +187,36 @@ export default function CommandsList() {
     }
   }
 
+  const handleDropReorder = useCallback(async (targetId: string) => {
+    if (!isDragEnabled || !draggingCommandId || draggingCommandId === targetId) {
+      setDraggingCommandId(null)
+      return
+    }
+
+    const currentCommands = useStore.getState().commands
+    const sourceIndex = currentCommands.findIndex((command) => command.id === draggingCommandId)
+    const targetIndex = currentCommands.findIndex((command) => command.id === targetId)
+
+    if (sourceIndex === -1 || targetIndex === -1) {
+      setDraggingCommandId(null)
+      return
+    }
+
+    const nextCommands = [...currentCommands]
+    const [moved] = nextCommands.splice(sourceIndex, 1)
+    nextCommands.splice(targetIndex, 0, moved)
+    setCommands(nextCommands)
+    setSelectedIndex(targetIndex)
+    setDraggingCommandId(null)
+
+    try {
+      const savedCommands = await window.electronAPI.reorderCommands(nextCommands.map((command) => command.id))
+      setCommands(savedCommands)
+    } catch (error) {
+      console.error('Failed to reorder commands:', error)
+    }
+  }, [draggingCommandId, isDragEnabled, setCommands, setSelectedIndex])
+
   // 获取指令图标
   const getCommandIcon = (type: string) => {
     switch (type) {
@@ -217,6 +249,21 @@ export default function CommandsList() {
                 <div
                   key={command.id}
                   data-command-index={index}
+                  draggable={isDragEnabled}
+                  onDragStart={() => {
+                    if (!isDragEnabled) return
+                    setDraggingCommandId(command.id)
+                  }}
+                  onDragEnd={() => setDraggingCommandId(null)}
+                  onDragOver={(e) => {
+                    if (!isDragEnabled || !draggingCommandId || draggingCommandId === command.id) return
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    handleDropReorder(command.id)
+                  }}
                   className={`group px-3 py-2 cursor-pointer transition-colors ${
                     index === selectedIndex
                       ? 'bg-[var(--color-selected)]'

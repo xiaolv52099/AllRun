@@ -352,6 +352,10 @@ function setupIPCHandlers() {
     return commandsStore.delete(id)
   })
 
+  ipcMain.handle('reorder-commands', async (_, ids) => {
+    return commandsStore.reorder(ids)
+  })
+
   ipcMain.handle('execute-command', async (_, id, params) => {
     const command = commandsStore.getById(id)
     if (command) {

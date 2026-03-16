@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addCommand: (command) => ipcRenderer.invoke('add-command', command),
   updateCommand: (id, command) => ipcRenderer.invoke('update-command', id, command),
   deleteCommand: (id) => ipcRenderer.invoke('delete-command', id),
+  reorderCommands: (ids) => ipcRenderer.invoke('reorder-commands', ids),
   executeCommand: (id, params) => ipcRenderer.invoke('execute-command', id, params),
 
   // 剪切板

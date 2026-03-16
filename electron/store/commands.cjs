@@ -100,6 +100,34 @@ class CommandsStore {
     return false
   }
 
+  reorder(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return this.getAll()
+    }
+
+    const map = new Map(this.commands.map((command) => [command.id, command]))
+    const used = new Set()
+    const reordered = []
+
+    ids.forEach((id) => {
+      if (used.has(id)) return
+      const command = map.get(id)
+      if (!command) return
+      used.add(id)
+      reordered.push(command)
+    })
+
+    this.commands.forEach((command) => {
+      if (!used.has(command.id)) {
+        reordered.push(command)
+      }
+    })
+
+    this.commands = reordered
+    this.save()
+    return this.getAll()
+  }
+
   import(commands) {
     this.commands = commands
     this.save()

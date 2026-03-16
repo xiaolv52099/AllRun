@@ -1,4 +1,7 @@
 export type HistoryType = 'text' | 'image' | 'file'
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K]
+}
 
 export interface HistoryMetadata {
   fileName?: string
@@ -59,6 +62,8 @@ export interface AppConfig {
     theme: 'dark' | 'light'
     settingsZoom: number
     language: 'zh-CN' | 'zh-TW' | 'en-US' | 'ko-KR' | 'ja-JP'
+    tabOrder: TabType[]
+    favoriteOrder: string[]
   }
 }
 
@@ -81,12 +86,13 @@ export interface ElectronAPI {
   updateRemark: (id: string, remark: string) => Promise<boolean>
 
   getConfig: () => Promise<AppConfig>
-  updateConfig: (config: Partial<AppConfig>) => Promise<AppConfig>
+  updateConfig: (config: DeepPartial<AppConfig>) => Promise<AppConfig>
 
   getCommands: () => Promise<Command[]>
   addCommand: (command: Omit<Command, 'id'>) => Promise<Command>
   updateCommand: (id: string, command: Partial<Command>) => Promise<Command | undefined>
   deleteCommand: (id: string) => Promise<boolean>
+  reorderCommands: (ids: string[]) => Promise<Command[]>
   executeCommand: (
     id: string,
     params?: Record<string, unknown> & {

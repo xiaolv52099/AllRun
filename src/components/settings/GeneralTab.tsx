@@ -2,6 +2,7 @@ import { useStore } from '../../stores/useStore'
 import { useState, useEffect } from 'react'
 import { languageOptions, type LanguageCode } from '../../i18n'
 import { useI18n } from '../../hooks/useI18n'
+import { DEFAULT_TAB_ORDER } from '../../utils/tabOrder'
 
 const defaultGeneralConfig = {
   autoStart: false,
@@ -14,6 +15,8 @@ const defaultAppearanceConfig = {
   theme: 'dark' as const,
   settingsZoom: 100,
   language: 'zh-CN' as LanguageCode,
+  tabOrder: [...DEFAULT_TAB_ORDER],
+  favoriteOrder: [] as string[],
 }
 
 export default function GeneralTab() {

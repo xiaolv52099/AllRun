@@ -68,6 +68,8 @@ export default function HistoryList() {
     setHistory,
     commands,
     setCommands,
+    config,
+    setConfig,
     searchQuery,
     activeTab,
     selectedIndex,
@@ -79,6 +81,7 @@ export default function HistoryList() {
 
   const listRef = useRef<List>(null)
   const [previewImage, setPreviewImage] = useState<HistoryItem | null>(null)
+  const [draggingFavoriteId, setDraggingFavoriteId] = useState<string | null>(null)
   const [paramDialogState, setParamDialogState] = useState<{
     command: Command
     paramNames: string[]
@@ -126,6 +129,31 @@ export default function HistoryList() {
     })
   }, [setHistory])
 
+  const favoriteOrderedIds = useMemo(() => {
+    const favoriteIds = history.filter((item) => item.isFavorited).map((item) => item.id)
+    const favoriteIdSet = new Set(favoriteIds)
+    const preferredOrder = config?.appearance?.favoriteOrder || []
+    const seen = new Set<string>()
+    const result: string[] = []
+
+    preferredOrder.forEach((id) => {
+      if (!favoriteIdSet.has(id) || seen.has(id)) {
+        return
+      }
+      seen.add(id)
+      result.push(id)
+    })
+
+    favoriteIds.forEach((id) => {
+      if (!seen.has(id)) {
+        seen.add(id)
+        result.push(id)
+      }
+    })
+
+    return result
+  }, [config?.appearance?.favoriteOrder, history])
+
   const filteredHistory = useMemo(() => {
     let result = history
 
@@ -135,6 +163,15 @@ export default function HistoryList() {
       result = result.filter((item) => item.type === 'image')
     } else if (activeTab === 'favorites') {
       result = result.filter((item) => item.isFavorited)
+      const rank = new Map(favoriteOrderedIds.map((id, index) => [id, index]))
+      result = [...result].sort((a, b) => {
+        const aRank = rank.get(a.id)
+        const bRank = rank.get(b.id)
+        if (aRank === undefined && bRank === undefined) return 0
+        if (aRank === undefined) return 1
+        if (bRank === undefined) return -1
+        return aRank - bRank
+      })
     }
 
     if (searchQuery.trim()) {
@@ -143,7 +180,7 @@ export default function HistoryList() {
     }
 
     return result
-  }, [activeTab, history, searchQuery])
+  }, [activeTab, favoriteOrderedIds, history, searchQuery])
 
   const commandSearchResults = useMemo(() => {
     if (activeTab !== 'all' || !searchQuery.trim()) {
@@ -157,8 +194,8 @@ export default function HistoryList() {
   const items = useMemo<ListEntry[]>(() => {
     if (activeTab === 'all' && searchQuery.trim()) {
       return [
-        ...filteredHistory.map((item) => ({ kind: 'history', item }) as const),
         ...commandSearchResults.map((item) => ({ kind: 'command', item }) as const),
+        ...filteredHistory.map((item) => ({ kind: 'history', item }) as const),
       ]
     }
 
@@ -291,19 +328,65 @@ export default function HistoryList() {
     }
   }, [selectedIndex])
 
+  const persistFavoriteOrder = useCallback(async (nextOrder: string[]) => {
+    try {
+      const latest = await window.electronAPI.updateConfig({
+        appearance: {
+          favoriteOrder: nextOrder,
+        },
+      })
+      setConfig(latest)
+    } catch (error) {
+      console.error('Failed to persist favorite order:', error)
+    }
+  }, [setConfig])
+
   const handleToggleFavorite = useCallback(async (id: string) => {
     await window.electronAPI.toggleFavorite(id)
+    const target = history.find((item) => item.id === id)
+    const nextIsFavorited = !target?.isFavorited
+
     setHistory(
       history.map((item) =>
-        item.id === id ? { ...item, isFavorited: !item.isFavorited } : item
+        item.id === id ? { ...item, isFavorited: nextIsFavorited } : item
       )
     )
-  }, [history, setHistory])
+
+    const nextOrder = nextIsFavorited
+      ? [id, ...favoriteOrderedIds.filter((favoriteId) => favoriteId !== id)]
+      : favoriteOrderedIds.filter((favoriteId) => favoriteId !== id)
+    await persistFavoriteOrder(nextOrder)
+  }, [favoriteOrderedIds, history, persistFavoriteOrder, setHistory])
+
+  const favoriteDragEnabled = activeTab === 'favorites' && !searchQuery.trim()
+
+  const handleDropFavorite = useCallback(async (targetId: string) => {
+    if (!favoriteDragEnabled || !draggingFavoriteId || draggingFavoriteId === targetId) {
+      setDraggingFavoriteId(null)
+      return
+    }
+
+    const sourceIndex = favoriteOrderedIds.indexOf(draggingFavoriteId)
+    const targetIndex = favoriteOrderedIds.indexOf(targetId)
+    if (sourceIndex === -1 || targetIndex === -1) {
+      setDraggingFavoriteId(null)
+      return
+    }
+
+    const nextOrder = [...favoriteOrderedIds]
+    const [moved] = nextOrder.splice(sourceIndex, 1)
+    nextOrder.splice(targetIndex, 0, moved)
+    setDraggingFavoriteId(null)
+    await persistFavoriteOrder(nextOrder)
+  }, [draggingFavoriteId, favoriteDragEnabled, favoriteOrderedIds, persistFavoriteOrder])
 
   const handleDelete = useCallback(async (id: string) => {
     await window.electronAPI.deleteHistory(id)
     setHistory(history.filter((item) => item.id !== id))
-  }, [history, setHistory])
+    if (favoriteOrderedIds.includes(id)) {
+      await persistFavoriteOrder(favoriteOrderedIds.filter((favoriteId) => favoriteId !== id))
+    }
+  }, [favoriteOrderedIds, history, persistFavoriteOrder, setHistory])
 
   const handleUpdateRemark = useCallback(async (id: string, remark: string) => {
     const value = remark.trim()
@@ -322,8 +405,26 @@ export default function HistoryList() {
 
       if (entry.kind === 'history') {
         const item = entry.item
+        const isDraggableFavorite = favoriteDragEnabled && item.isFavorited
         return (
-          <div style={style}>
+          <div
+            style={style}
+            draggable={isDraggableFavorite}
+            onDragStart={() => {
+              if (!isDraggableFavorite) return
+              setDraggingFavoriteId(item.id)
+            }}
+            onDragEnd={() => setDraggingFavoriteId(null)}
+            onDragOver={(e) => {
+              if (!isDraggableFavorite || !draggingFavoriteId || draggingFavoriteId === item.id) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              handleDropFavorite(item.id)
+            }}
+          >
             <HistoryItemComponent
               item={item}
               isSelected={index === selectedIndex}
@@ -403,9 +504,12 @@ export default function HistoryList() {
     },
     [
       activeTab,
+      draggingFavoriteId,
+      favoriteDragEnabled,
       handleCopy,
       handleDelete,
       handleDeleteCommand,
+      handleDropFavorite,
       handleExecuteCommand,
       handleToggleFavorite,
       handleUpdateRemark,

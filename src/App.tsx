@@ -8,8 +8,7 @@ import Settings from './components/Settings'
 import { useStore } from './stores/useStore'
 import { TabType, Command } from './types'
 import { useI18n } from './hooks/useI18n'
-
-const tabOrder: TabType[] = ['all', 'text', 'image', 'favorites', 'commands']
+import { normalizeTabOrder } from './utils/tabOrder'
 
 function detectSettingsView() {
   if (typeof window === 'undefined') return false
@@ -30,6 +29,10 @@ function App() {
   const { t } = useI18n()
   const hasElectronAPI = typeof window !== 'undefined' && 'electronAPI' in window
   const isSettingsView = useMemo(() => detectSettingsView(), [])
+  const tabOrder = useMemo(
+    () => normalizeTabOrder(config?.appearance?.tabOrder),
+    [config?.appearance?.tabOrder]
+  )
 
   useEffect(() => {
     const currentTheme = config?.appearance?.theme || 'dark'
@@ -87,6 +90,7 @@ function App() {
       setCommands={setCommands}
       setSearchQuery={setSearchQuery}
       setSelectedIndex={setSelectedIndex}
+      tabOrder={tabOrder}
       t={t}
     />
   )
@@ -99,6 +103,7 @@ function MainWindow({
   setCommands,
   setSearchQuery,
   setSelectedIndex,
+  tabOrder,
   t,
 }: {
   activeTab: TabType
@@ -107,6 +112,7 @@ function MainWindow({
   setCommands: (commands: Command[]) => void
   setSearchQuery: (query: string) => void
   setSelectedIndex: (index: number) => void
+  tabOrder: TabType[]
   t: (key: string, vars?: Record<string, string | number>) => string
 }) {
   // 监听设置快捷键
@@ -182,7 +188,7 @@ function MainWindow({
 
     window.addEventListener('keydown', handleTabSwitch)
     return () => window.removeEventListener('keydown', handleTabSwitch)
-  }, [activeTab, setActiveTab, setSearchQuery])
+  }, [activeTab, setActiveTab, setSearchQuery, tabOrder])
 
   // 每次窗口打开时，重置搜索和 Tab
   useEffect(() => {
@@ -223,7 +229,7 @@ function MainWindow({
 
       <div className="flex-1 flex flex-col overflow-hidden no-drag">
         <SearchBar />
-        <TabBar />
+        <TabBar tabOrder={tabOrder} />
         <div className="flex-1 overflow-hidden">
           {activeTab === 'commands' ? <CommandsList /> : <HistoryList />}
         </div>

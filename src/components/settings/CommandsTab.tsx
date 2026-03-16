@@ -36,7 +36,6 @@ export default function CommandsTab() {
       type: 'shell',
       command: 'echo "Hello"',
       bashParams: '',
-      shortcut: '',
     }
     const added = await window.electronAPI.addCommand(newCommand)
     setCommands([...commands, added])
@@ -204,17 +203,6 @@ export default function CommandsTab() {
                     />
                   </div>
                 )}
-
-                <div>
-                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1">{t('commands.field.shortcut')}</label>
-                  <input
-                    type="text"
-                    value={editForm.shortcut || ''}
-                    onChange={(e) => setEditForm({ ...editForm, shortcut: e.target.value })}
-                    placeholder="Cmd+Shift+G"
-                    className="w-full px-2 py-1 text-sm text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
-                  />
-                </div>
 
                 <div className="flex items-center gap-2">
                   <button
