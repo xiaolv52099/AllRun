@@ -25,6 +25,7 @@ export type CommandType = 'open_dir' | 'url' | 'shell' | 'script'
 export interface Command {
   id: string
   name: string
+  remark?: string
   type: CommandType
   path?: string
   url?: string

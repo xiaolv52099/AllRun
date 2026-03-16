@@ -6,9 +6,10 @@ import { Play, Trash2 } from 'lucide-react'
 import CommandParamsDialog from './CommandParamsDialog'
 import { parseCommandParamInput, parseCommandParamNames } from '../utils/commandParams'
 import { useI18n } from '../hooks/useI18n'
+import { getCommandDetail } from '../utils/commandDisplay'
 
 const commandFuseOptions = {
-  keys: ['name', 'description', 'path', 'url', 'command'],
+  keys: ['name', 'remark', 'description', 'path', 'url', 'command'],
   threshold: 0.4,
 }
 
@@ -72,6 +73,9 @@ export default function CommandsList() {
     const fuse = new Fuse(commands, commandFuseOptions)
     return fuse.search(searchQuery).map((item) => item.item)
   }, [commands, searchQuery])
+
+  const selectedCommand = filteredCommands[selectedIndex]
+  const selectedCommandDetail = selectedCommand ? getCommandDetail(selectedCommand) : ''
 
   useEffect(() => {
     if (selectedIndex > filteredCommands.length - 1) {
@@ -199,75 +203,83 @@ export default function CommandsList() {
 
   return (
     <>
-      <div ref={containerRef} className="h-full overflow-y-auto">
-        {filteredCommands.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-[var(--color-text-secondary)]">
-              {searchQuery ? t('commands.noMatch') : t('commands.empty')}
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-[var(--color-border-muted)]">
-            {filteredCommands.map((command, index) => (
-              <div
-                key={command.id}
-                data-command-index={index}
-                className={`group px-3 py-1.5 cursor-pointer transition-colors ${
-                  index === selectedIndex
-                    ? 'bg-[var(--color-selected)]'
-                    : 'hover:bg-[var(--color-bg-hover)]'
-                }`}
-                onMouseEnter={() => setSelectedIndex(index)}
-                onClick={() => {
-                  setSelectedIndex(index)
-                  handleExecute(command)
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{getCommandIcon(command.type)}</span>
-                    <div>
-                      <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                        {highlightKeyword(command.name, searchQuery)}
-                      </p>
-                      <p className="text-xs text-[var(--color-text-secondary)]">
-                        {command.description || command.path || command.url || command.command}
-                      </p>
+      <div className="h-full flex flex-col">
+        <div ref={containerRef} className="flex-1 overflow-y-auto">
+          {filteredCommands.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-[var(--color-text-secondary)]">
+                {searchQuery ? t('commands.noMatch') : t('commands.empty')}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[var(--color-border-muted)]">
+              {filteredCommands.map((command, index) => (
+                <div
+                  key={command.id}
+                  data-command-index={index}
+                  className={`group px-3 py-2 cursor-pointer transition-colors ${
+                    index === selectedIndex
+                      ? 'bg-[var(--color-selected)]'
+                      : 'hover:bg-[var(--color-bg-hover)]'
+                  }`}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  onClick={() => {
+                    setSelectedIndex(index)
+                    handleExecute(command)
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <span className="text-lg">{getCommandIcon(command.type)}</span>
+                      <div className="flex items-center justify-between gap-3 min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+                          {highlightKeyword(command.name, searchQuery)}
+                        </p>
+                        <p className="text-xs text-[var(--color-text-secondary)] truncate shrink-0 max-w-[45%]">
+                          {command.remark?.trim() ? highlightKeyword(command.remark, searchQuery) : t('history.remarkEmpty')}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleExecute(command)
+                        }}
+                        disabled={executingId === command.id}
+                        className="p-1.5 rounded hover:bg-[var(--color-border)]"
+                        title={t('common.execute')}
+                      >
+                        <Play
+                          className={`w-4 h-4 text-[var(--color-text-secondary)] ${
+                            executingId === command.id ? 'animate-pulse' : ''
+                          }`}
+                        />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDelete(command.id)
+                        }}
+                        className="p-1.5 rounded hover:bg-[var(--color-border)]"
+                        title={t('common.delete')}
+                      >
+                        <Trash2 className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleExecute(command)
-                      }}
-                      disabled={executingId === command.id}
-                      className="p-1.5 rounded hover:bg-[var(--color-border)]"
-                      title={t('common.execute')}
-                    >
-                      <Play
-                        className={`w-4 h-4 text-[var(--color-text-secondary)] ${
-                          executingId === command.id ? 'animate-pulse' : ''
-                        }`}
-                      />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDelete(command.id)
-                      }}
-                      className="p-1.5 rounded hover:bg-[var(--color-border)]"
-                      title={t('common.delete')}
-                    >
-                      <Trash2 className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="px-3 py-2 border-t border-[var(--color-border-muted)] bg-[var(--color-bg-secondary)]">
+          <p className="text-xs text-[var(--color-text-secondary)] truncate">
+            {selectedCommandDetail}
+          </p>
+        </div>
       </div>
 
       {paramDialogState && (

@@ -33,6 +33,63 @@ function broadcastToWindows(channel, payload) {
   })
 }
 
+function isWindowVisible(win) {
+  return Boolean(win && !win.isDestroyed() && win.isVisible())
+}
+
+function closeSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.close()
+  }
+}
+
+async function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return
+  }
+
+  captureFrontmostApplication().catch(() => {
+    // ignore
+  })
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore()
+  }
+
+  try {
+    app.focus({ steal: true })
+  } catch {
+    // ignore
+  }
+
+  const bringToFront = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return
+    }
+
+    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    mainWindow.show()
+    mainWindow.focus()
+    mainWindow.webContents.focus()
+    mainWindow.moveTop()
+    mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })
+  }
+
+  bringToFront()
+  await sleep(40)
+
+  if (!mainWindow.isVisible() || !mainWindow.isFocused()) {
+    bringToFront()
+  }
+}
+
+async function hideAllWindows() {
+  closeSettingsWindow()
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.hide()
+  }
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -254,6 +311,7 @@ function setupIPCHandlers() {
   })
 
   ipcMain.handle('update-config', async (_, config) => {
+    const previous = configStore.getConfig()
     configStore.updateConfig(config)
     const latest = configStore.getConfig()
     broadcastToWindows('config-updated', latest)
@@ -261,10 +319,17 @@ function setupIPCHandlers() {
     historyStore.setMaxItems(latest.general.maxHistoryItems)
     autoStartUtils.setAutoStart(Boolean(latest.general.autoStart))
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    const shortcutsChanged =
+      previous.shortcuts.toggleWindow !== latest.shortcuts.toggleWindow ||
+      previous.shortcuts.openSettings !== latest.shortcuts.openSettings
+
+    if (shortcutsChanged && mainWindow && !mainWindow.isDestroyed()) {
       shortcutUtils.setupShortcuts(mainWindow, configStore, {
         beforeShow: captureFrontmostApplication,
         openSettingsWindow,
+        showMainWindow,
+        hideAllWindows,
+        isAnyWindowVisible: () => isWindowVisible(mainWindow) || isWindowVisible(settingsWindow),
       })
     }
 
@@ -352,18 +417,14 @@ function setupIPCHandlers() {
   })
 
   ipcMain.handle('show-window', async () => {
-    await captureFrontmostApplication()
-    mainWindow?.show()
-    mainWindow?.focus()
+    await showMainWindow()
   })
 
   ipcMain.handle('toggle-window', async () => {
-    if (mainWindow?.isVisible()) {
-      mainWindow.hide()
+    if (isWindowVisible(mainWindow) || isWindowVisible(settingsWindow)) {
+      await hideAllWindows()
     } else {
-      await captureFrontmostApplication()
-      mainWindow.show()
-      mainWindow.focus()
+      await showMainWindow()
     }
   })
 
@@ -373,9 +434,7 @@ function setupIPCHandlers() {
   })
 
   ipcMain.handle('close-settings-window', async () => {
-    if (settingsWindow && !settingsWindow.isDestroyed()) {
-      settingsWindow.close()
-    }
+    closeSettingsWindow()
     return true
   })
 
@@ -400,9 +459,7 @@ if (!gotSingleInstanceLock) {
       mainWindow.restore()
     }
 
-    await captureFrontmostApplication()
-    mainWindow.show()
-    mainWindow.focus()
+    await showMainWindow()
   })
 
   app.whenReady().then(() => {
@@ -422,6 +479,9 @@ if (!gotSingleInstanceLock) {
     shortcutUtils.setupShortcuts(mainWindow, configStore, {
       beforeShow: captureFrontmostApplication,
       openSettingsWindow,
+      showMainWindow,
+      hideAllWindows,
+      isAnyWindowVisible: () => isWindowVisible(mainWindow) || isWindowVisible(settingsWindow),
     })
 
     clipboardWatcher = new ClipboardWatcher(historyStore, (item) => {

@@ -3,6 +3,7 @@ import { Plus, Play, Trash2, Save } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { Command } from '../../types'
 import { useI18n } from '../../hooks/useI18n'
+import { getCommandDetail } from '../../utils/commandDisplay'
 
 type CommandType = 'open_dir' | 'url' | 'shell' | 'script'
 
@@ -31,6 +32,7 @@ export default function CommandsTab() {
   const handleAdd = async () => {
     const newCommand: Omit<Command, 'id'> = {
       name: t('commands.newName'),
+      remark: '',
       type: 'shell',
       command: 'echo "Hello"',
       bashParams: '',
@@ -103,6 +105,19 @@ export default function CommandsTab() {
                       className="w-full px-2 py-1 text-sm text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs text-[var(--color-text-secondary)] mb-1">{t('history.remark')}</label>
+                    <input
+                      type="text"
+                      value={editForm.remark || ''}
+                      onChange={(e) => setEditForm({ ...editForm, remark: e.target.value })}
+                      placeholder={t('history.inputRemark')}
+                      className="w-full px-2 py-1 text-sm text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-xs text-[var(--color-text-secondary)] mb-1">{t('commands.field.type')}</label>
                     <select
@@ -230,21 +245,18 @@ export default function CommandsTab() {
               </div>
             ) : (
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                    {command.name}
-                  </p>
-                  <p className="text-xs text-[var(--color-text-secondary)] break-words">
-                    {command.type === 'open_dir' && command.path}
-                    {command.type === 'url' && command.url}
-                    {command.type === 'shell' && command.command}
-                    {command.type === 'script' && command.path}
-                  </p>
-                  {command.type === 'shell' && command.bashParams && (
-                    <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                      {t('commands.paramPreview', { value: command.bashParams })}
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+                      {command.name}
                     </p>
-                  )}
+                    <p className="text-xs text-[var(--color-text-secondary)] truncate shrink-0 max-w-[45%]">
+                      {command.remark?.trim() || t('history.remarkEmpty')}
+                    </p>
+                  </div>
+                  <p className="text-xs text-[var(--color-text-secondary)] truncate">
+                    {getCommandDetail(command)}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0 self-center">
                   <button

@@ -5,10 +5,26 @@ async function toggleWindow(mainWindow, hooks) {
     return
   }
 
-  if (mainWindow.isVisible()) {
-    mainWindow.hide()
+  const anyWindowVisible = typeof hooks.isAnyWindowVisible === 'function'
+    ? hooks.isAnyWindowVisible()
+    : mainWindow.isVisible()
+
+  if (anyWindowVisible) {
+    if (typeof hooks.hideAllWindows === 'function') {
+      await hooks.hideAllWindows()
+    } else {
+      mainWindow.hide()
+    }
+    return
+  }
+
+  if (typeof hooks.showMainWindow === 'function') {
+    await hooks.showMainWindow()
   } else {
     await hooks.beforeShow?.()
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore()
+    }
     mainWindow.show()
     mainWindow.focus()
   }

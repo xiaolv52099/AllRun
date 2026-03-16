@@ -54,6 +54,11 @@ class HistoryStore {
     if (existing) {
       existing.copyCount++
       existing.updatedAt = now
+      const existingIndex = this.items.findIndex(i => i.id === existing.id)
+      if (existingIndex > 0) {
+        this.items.splice(existingIndex, 1)
+        this.items.unshift(existing)
+      }
       this.save()
       return existing
     }

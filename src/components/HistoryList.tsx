@@ -15,7 +15,7 @@ const historyFuseOptions = {
 }
 
 const commandFuseOptions = {
-  keys: ['name', 'description', 'path', 'url', 'command'],
+  keys: ['name', 'remark', 'description', 'path', 'url', 'command'],
   threshold: 0.4,
 }
 
@@ -118,11 +118,7 @@ export default function HistoryList() {
       const exists = currentHistory.some((current) => current.id === item.id)
 
       if (exists) {
-        setHistory(
-          currentHistory.map((current) =>
-            current.id === item.id ? item : current
-          )
-        )
+        setHistory([item, ...currentHistory.filter((current) => current.id !== item.id)])
         return
       }
 
@@ -363,15 +359,17 @@ export default function HistoryList() {
                 : 'hover:bg-[var(--color-bg-hover)]'
             }`}
           >
-            <div className="flex items-center justify-between h-full">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between h-full gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
                 <span className="text-lg">{getCommandIcon(command.type)}</span>
-                <div>
-                  <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                <div className="flex items-center justify-between gap-3 min-w-0 flex-1">
+                  <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
                     {highlightKeyword(command.name, searchQuery)}
                   </p>
-                  <p className="text-xs text-[var(--color-text-secondary)]">
-                    {command.description || command.path || command.url || command.command}
+                  <p className="text-xs text-[var(--color-text-secondary)] truncate shrink-0 max-w-[45%]">
+                    {command.remark?.trim()
+                      ? highlightKeyword(command.remark, searchQuery)
+                      : t('history.remarkEmpty')}
                   </p>
                 </div>
               </div>

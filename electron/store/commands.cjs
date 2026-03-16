@@ -7,6 +7,7 @@ const DEFAULT_COMMANDS = [
   {
     id: 'cmd-001',
     name: '打开下载目录',
+    remark: '',
     type: 'open_dir',
     path: '~/Downloads',
     shortcut: 'Cmd+Shift+D'
@@ -14,6 +15,7 @@ const DEFAULT_COMMANDS = [
   {
     id: 'cmd-002',
     name: '打开 GitHub',
+    remark: '',
     type: 'url',
     url: 'https://github.com',
     shortcut: 'Cmd+Shift+G'
@@ -32,7 +34,10 @@ class CommandsStore {
     try {
       if (fs.existsSync(this.filePath)) {
         const data = fs.readFileSync(this.filePath, 'utf-8')
-        this.commands = JSON.parse(data)
+        this.commands = JSON.parse(data).map((command) => ({
+          remark: '',
+          ...command,
+        }))
       } else {
         // 使用默认配置
         this.commands = [...DEFAULT_COMMANDS]
@@ -66,6 +71,7 @@ class CommandsStore {
 
   add(command) {
     const newCommand = {
+      remark: '',
       ...command,
       id: uuidv4()
     }
