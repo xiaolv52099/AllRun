@@ -2,6 +2,8 @@ const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const sharp = require('sharp')
+const pngToIcoModule = require('png-to-ico')
+const pngToIco = pngToIcoModule.default || pngToIcoModule
 
 const rootDir = path.resolve(__dirname, '..')
 const buildDir = path.join(rootDir, 'build')
@@ -81,27 +83,37 @@ async function generatePngs() {
 }
 
 function generateIcns() {
-  execFileSync('iconutil', ['-c', 'icns', iconsetDir, '-o', icnsPath], {
-    cwd: rootDir,
-    stdio: 'inherit',
-  })
+  if (process.platform !== 'darwin') {
+    console.log('[icon] Skip build/icon.icns on non-macOS platform.')
+    return
+  }
+
+  try {
+    execFileSync('iconutil', ['-c', 'icns', iconsetDir, '-o', icnsPath], {
+      cwd: rootDir,
+      stdio: 'inherit',
+    })
+  } catch (error) {
+    console.warn('[icon] Skip build/icon.icns:', error?.message || error)
+  }
 }
 
-function generateIcoFallback() {
+async function generateIco() {
   try {
-    execFileSync('sips', ['-s', 'format', 'ico', masterPngPath, '--out', icoPath], {
-      cwd: rootDir,
-      stdio: 'pipe',
-    })
-  } catch {
-    console.warn('[icon] Skip build/icon.ico (sips on this system does not support ico output).')
+    const icoSourceSizes = [16, 24, 32, 48, 64, 128, 256]
+    const buffer = await pngToIco(
+      icoSourceSizes.map((size) => path.join(linuxIconsDir, `${size}x${size}.png`))
+    )
+    fs.writeFileSync(icoPath, buffer)
+  } catch (error) {
+    console.warn('[icon] Skip build/icon.ico:', error?.message || error)
   }
 }
 
 async function main() {
   await generatePngs()
   generateIcns()
-  generateIcoFallback()
+  await generateIco()
   console.log('[icon] Generated:')
   console.log(`- ${path.relative(rootDir, masterPngPath)}`)
   console.log(`- ${path.relative(rootDir, icnsPath)}`)

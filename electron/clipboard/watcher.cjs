@@ -1,4 +1,6 @@
 const { clipboard } = require('electron')
+const path = require('path')
+const { getClipboardFilePaths } = require('./filePaths.cjs')
 
 class ClipboardWatcher {
   constructor(historyStore, onChange) {
@@ -20,7 +22,7 @@ class ClipboardWatcher {
       this.lastImageHash = this.hashImage(image)
     }
 
-    const initialFilePaths = this.getFilePaths()
+    const initialFilePaths = getClipboardFilePaths()
     if (initialFilePaths.length > 0) {
       this.lastFileSignature = initialFilePaths.join('\n')
     }
@@ -37,26 +39,22 @@ class ClipboardWatcher {
   }
 
   check() {
-    const formats = clipboard.availableFormats()
-
-    // 检查图片
-    const image = clipboard.readImage()
-    if (!image.isEmpty()) {
-      const hash = this.hashImage(image)
-      if (hash !== this.lastImageHash) {
-        this.lastImageHash = hash
-        this.lastContent = ''
-        this.lastFileSignature = ''
-        this.handleImage(image)
-        return
+    try {
+      // 检查图片
+      const image = clipboard.readImage()
+      if (!image.isEmpty()) {
+        const hash = this.hashImage(image)
+        if (hash !== this.lastImageHash) {
+          this.lastImageHash = hash
+          this.lastContent = ''
+          this.lastFileSignature = ''
+          this.handleImage(image)
+          return
+        }
       }
-    }
 
-    // 检查文件
-    const hasFileFormat = formats.includes('public.file-url') || formats.includes('NSFilenamesPboardType')
-    if (hasFileFormat) {
-      // 使用原生方法获取文件路径
-      const filePaths = this.getFilePaths()
+      // 检查文件
+      const filePaths = getClipboardFilePaths()
       if (filePaths.length > 0) {
         const signature = filePaths.join('\n')
         if (signature === this.lastFileSignature) {
@@ -69,15 +67,18 @@ class ClipboardWatcher {
         this.handleFiles(filePaths)
         return
       }
-    }
 
-    // 检查文本
-    const text = clipboard.readText()
-    if (text && text !== this.lastContent) {
-      this.lastContent = text
-      this.lastImageHash = ''
-      this.lastFileSignature = ''
-      this.handleText(text)
+      // 检查文本
+      const text = clipboard.readText()
+      if (text && text !== this.lastContent) {
+        this.lastContent = text
+        this.lastImageHash = ''
+        this.lastFileSignature = ''
+        this.handleText(text)
+      }
+    } catch (error) {
+      // 避免单次剪贴板解析异常导致监听链路中断
+      console.error('Clipboard watcher check failed:', error)
     }
   }
 
@@ -108,31 +109,11 @@ class ClipboardWatcher {
         type: 'file',
         content: filePath,
         metadata: {
-          fileName: filePath.split('/').pop() || filePath,
+          fileName: path.basename(filePath) || filePath,
         }
       })
       this.emitChange(item)
     })
-  }
-
-  getFilePaths() {
-    // macOS 获取文件路径
-    // 这里需要使用原生模块或 Electron 的 clipboard API
-    // 简化处理
-    try {
-      const text = clipboard.readText().trim()
-      if (!text) {
-        return []
-      }
-
-      return text
-        .split(/\r?\n/)
-        .filter(line => line.startsWith('file://'))
-        .map(line => decodeURIComponent(line.replace('file://', '')))
-    } catch {
-      // ignore
-    }
-    return []
   }
 
   emitChange(item) {

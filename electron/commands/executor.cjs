@@ -1,5 +1,6 @@
 const { shell } = require('electron');
 const { spawn } = require('child_process');
+const path = require('path')
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -38,6 +39,26 @@ function buildNamedArgsEnv(namedArgs) {
   return env
 }
 
+function getHomeDir() {
+  return process.env.HOME || process.env.USERPROFILE || ''
+}
+
+function expandHomePath(value) {
+  if (!value || typeof value !== 'string') {
+    return value
+  }
+
+  if (value === '~') {
+    return getHomeDir()
+  }
+
+  if (value.startsWith('~/') || value.startsWith('~\\')) {
+    return path.join(getHomeDir(), value.slice(2))
+  }
+
+  return value
+}
+
 class CommandExecutor {
   execute(command, params = {}) {
     switch (command.type) {
@@ -56,7 +77,7 @@ class CommandExecutor {
 
   openDir(path) {
     // 替换 ~ 为用户目录
-    const expandedPath = path.replace(/^~/, process.env.HOME || '')
+    const expandedPath = expandHomePath(path)
     return shell.openPath(expandedPath)
   }
 
@@ -124,7 +145,7 @@ class CommandExecutor {
   }
 
   executeScript(scriptPath, params) {
-    const expandedPath = scriptPath.replace(/^~/, process.env.HOME || '')
+    const expandedPath = expandHomePath(scriptPath)
     const ext = expandedPath.split('.').pop()?.toLowerCase()
     const namedArgs = normalizeNamedArgs(params.commandNamedArgs)
     const orderedArgs = Array.isArray(params.commandArgs)
@@ -146,7 +167,19 @@ class CommandExecutor {
         interpreter = 'python3'
         break
       default:
-        interpreter = '/bin/sh'
+        interpreter = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'
+    }
+
+    let args
+    if (interpreter === 'cmd.exe') {
+      const renderedArgs = orderedArgs.map((arg) => quoteArg(arg, true)).join(' ')
+      const escapedPath = expandedPath.replace(/"/g, '\\"')
+      const commandLine = renderedArgs ? `"${escapedPath}" ${renderedArgs}` : `"${escapedPath}"`
+      args = ['/d', '/s', '/c', commandLine]
+    } else if (interpreter === 'powershell.exe') {
+      args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', expandedPath, ...orderedArgs]
+    } else {
+      args = [expandedPath, ...orderedArgs]
     }
 
     return new Promise((resolve, reject) => {
@@ -157,7 +190,7 @@ class CommandExecutor {
         ...buildNamedArgsEnv(namedArgs)
       }
 
-      const child = spawn(interpreter, [expandedPath, ...orderedArgs], {
+      const child = spawn(interpreter, args, {
         cwd: params.cwd,
         env
       })

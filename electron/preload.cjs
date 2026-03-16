@@ -58,5 +58,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const listener = (_event, config) => callback(config)
     ipcRenderer.on('config-updated', listener)
     return () => ipcRenderer.removeListener('config-updated', listener)
-  }
+  },
+  onCommandsUpdated: (callback) => {
+    const listener = (_event, commands) => callback(commands)
+    ipcRenderer.on('commands-updated', listener)
+    return () => ipcRenderer.removeListener('commands-updated', listener)
+  },
 })

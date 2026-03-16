@@ -11,6 +11,7 @@ const CommandsStore = require('./store/commands.cjs')
 const CommandExecutor = require('./commands/executor.cjs')
 const shortcutUtils = require('./utils/shortcut.cjs')
 const autoStartUtils = require('./utils/autoStart.cjs')
+const { getClipboardFilePaths } = require('./clipboard/filePaths.cjs')
 
 let mainWindow = null
 let settingsWindow = null
@@ -23,6 +24,8 @@ let configStore
 let commandsStore
 let commandExecutor
 let lastFrontmostAppPid = null
+const isDarwin = process.platform === 'darwin'
+const isWindows = process.platform === 'win32'
 
 function broadcastToWindows(channel, payload) {
   const targets = [mainWindow, settingsWindow]
@@ -48,9 +51,11 @@ async function showMainWindow() {
     return
   }
 
-  captureFrontmostApplication().catch(() => {
+  try {
+    await captureFrontmostApplication()
+  } catch {
     // ignore
-  })
+  }
 
   if (mainWindow.isMinimized()) {
     mainWindow.restore()
@@ -67,12 +72,16 @@ async function showMainWindow() {
       return
     }
 
-    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    if (isDarwin) {
+      mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    }
     mainWindow.show()
     mainWindow.focus()
     mainWindow.webContents.focus()
     mainWindow.moveTop()
-    mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })
+    if (isDarwin) {
+      mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })
+    }
   }
 
   bringToFront()
@@ -106,35 +115,85 @@ function runAppleScript(script) {
   })
 }
 
+function runPowerShell(script) {
+  return new Promise((resolve, reject) => {
+    execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(stderr?.trim() || error.message))
+        return
+      }
+      resolve(stdout.trim())
+    })
+  })
+}
+
 async function captureFrontmostApplication() {
-  if (process.platform !== 'darwin') {
+  if (isDarwin) {
+    try {
+      const output = await runAppleScript(
+        'tell application "System Events" to get unix id of first application process whose frontmost is true'
+      )
+      const pid = Number.parseInt(output, 10)
+      if (Number.isFinite(pid) && pid !== process.pid) {
+        lastFrontmostAppPid = pid
+      }
+    } catch {
+      // 无辅助权限时会失败，保留静默降级
+    }
     return
   }
 
-  try {
-    const output = await runAppleScript(
-      'tell application "System Events" to get unix id of first application process whose frontmost is true'
-    )
-    const pid = Number.parseInt(output, 10)
-    if (Number.isFinite(pid) && pid !== process.pid) {
-      lastFrontmostAppPid = pid
+  if (isWindows) {
+    try {
+      const output = await runPowerShell(`
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class Win32 {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+}
+"@
+$hwnd = [Win32]::GetForegroundWindow()
+$pid = 0
+[Win32]::GetWindowThreadProcessId($hwnd, [ref]$pid) | Out-Null
+Write-Output $pid
+`)
+      const pid = Number.parseInt(output, 10)
+      if (Number.isFinite(pid) && pid !== process.pid) {
+        lastFrontmostAppPid = pid
+      }
+    } catch {
+      // Windows 下获取前台窗口失败时静默降级
     }
-  } catch {
-    // 无辅助权限时会失败，保留静默降级
   }
 }
 
 async function focusLastFrontmostApplication() {
-  if (process.platform !== 'darwin' || !lastFrontmostAppPid) {
+  if (!lastFrontmostAppPid) {
     return
   }
 
-  try {
-    await runAppleScript(
-      `tell application "System Events" to set frontmost of first application process whose unix id is ${lastFrontmostAppPid} to true`
-    )
-  } catch {
-    // ignore
+  if (isDarwin) {
+    try {
+      await runAppleScript(
+        `tell application "System Events" to set frontmost of first application process whose unix id is ${lastFrontmostAppPid} to true`
+      )
+    } catch {
+      // ignore
+    }
+    return
+  }
+
+  if (isWindows) {
+    try {
+      await runPowerShell(`
+$ws = New-Object -ComObject WScript.Shell
+$null = $ws.AppActivate(${lastFrontmostAppPid})
+`)
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -146,18 +205,40 @@ async function pasteTextAtCursor(text) {
   clipboard.writeText(text)
   mainWindow?.hide()
 
-  if (process.platform === 'darwin') {
+  if (isDarwin) {
     await focusLastFrontmostApplication()
-    await sleep(120)
+    await sleep(40)
     try {
       await runAppleScript('tell application "System Events" to keystroke "v" using command down')
     } catch (error) {
       console.error('Failed to paste text at cursor:', error)
       return false
     }
+  } else if (isWindows) {
+    await focusLastFrontmostApplication()
+    await sleep(40)
+    try {
+      await runPowerShell(
+        '$ws = New-Object -ComObject WScript.Shell; $ws.SendKeys("^v")'
+      )
+    } catch (error) {
+      console.error('Failed to paste text at cursor (Windows):', error)
+      return false
+    }
   }
 
   return true
+}
+
+function getPlatformWindowEffects() {
+  if (!isDarwin) {
+    return {}
+  }
+
+  return {
+    vibrancy: 'under-window',
+    visualEffectState: 'active',
+  }
 }
 
 function createWindow() {
@@ -168,12 +249,11 @@ function createWindow() {
     width,
     height,
     minWidth: 360,
-    minHeight: 400,
+    minHeight: 320,
     show: false,
     frame: false,
     transparent: false,
-    vibrancy: 'under-window',
-    visualEffectState: 'active',
+    ...getPlatformWindowEffects(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -226,13 +306,12 @@ function createSettingsWindow() {
   settingsWindow = new BrowserWindow({
     width,
     height,
-    minWidth: 560,
-    minHeight: 420,
+    minWidth: 360,
+    minHeight: 320,
     show: false,
     frame: false,
     transparent: false,
-    vibrancy: 'under-window',
-    visualEffectState: 'active',
+    ...getPlatformWindowEffects(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -341,19 +420,31 @@ function setupIPCHandlers() {
   })
 
   ipcMain.handle('add-command', async (_, command) => {
-    return commandsStore.add(command)
+    const added = commandsStore.add(command)
+    broadcastToWindows('commands-updated', commandsStore.getAll())
+    return added
   })
 
   ipcMain.handle('update-command', async (_, id, command) => {
-    return commandsStore.update(id, command)
+    const updated = commandsStore.update(id, command)
+    if (updated) {
+      broadcastToWindows('commands-updated', commandsStore.getAll())
+    }
+    return updated
   })
 
   ipcMain.handle('delete-command', async (_, id) => {
-    return commandsStore.delete(id)
+    const deleted = commandsStore.delete(id)
+    if (deleted) {
+      broadcastToWindows('commands-updated', commandsStore.getAll())
+    }
+    return deleted
   })
 
   ipcMain.handle('reorder-commands', async (_, ids) => {
-    return commandsStore.reorder(ids)
+    const commands = commandsStore.reorder(ids)
+    broadcastToWindows('commands-updated', commands)
+    return commands
   })
 
   ipcMain.handle('execute-command', async (_, id, params) => {
@@ -379,8 +470,8 @@ function setupIPCHandlers() {
         type = 'text'
         content = text
       }
-      const filePaths = clipboard.read('public.file-url')
-      if (filePaths) {
+      const filePaths = getClipboardFilePaths()
+      if (filePaths.length > 0) {
         type = 'file'
         content = filePaths
       }
@@ -489,9 +580,7 @@ if (!gotSingleInstanceLock) {
     })
 
     clipboardWatcher = new ClipboardWatcher(historyStore, (item) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('clipboard-change', item)
-      }
+      broadcastToWindows('clipboard-change', item)
     })
     clipboardWatcher.start()
 
@@ -511,13 +600,13 @@ if (!gotSingleInstanceLock) {
   })
 
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
+    if (!isDarwin) {
       app.quit()
     }
   })
 }
 
-if (process.platform === 'darwin') {
+if (isDarwin) {
   app.dock?.hide()
 }
 

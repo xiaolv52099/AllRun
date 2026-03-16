@@ -209,11 +209,17 @@ export default function HistoryList() {
   }, [items.length, selectedIndex, setSelectedIndex])
 
   useEffect(() => {
-    return window.electronAPI.onWindowOpened(() => {
+    return window.electronAPI.onWindowOpened(async () => {
+      try {
+        const data = await window.electronAPI.getHistory()
+        setHistory(data)
+      } catch (error) {
+        console.error('Failed to refresh history on window open:', error)
+      }
       setSelectedIndex(0)
       listRef.current?.scrollTo(0)
     })
-  }, [setSelectedIndex])
+  }, [setHistory, setSelectedIndex])
 
   const handleCopy = useCallback(async (item: HistoryItem) => {
     if (item.type === 'text') {
@@ -306,21 +312,38 @@ export default function HistoryList() {
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setSelectedIndex(selectedIndex <= 0 ? items.length - 1 : selectedIndex - 1)
-      } else if (e.key === 'Enter' && items[selectedIndex]) {
-        if (activeTab === 'image') {
-          e.preventDefault()
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        const activeElement = document.activeElement
+        if (activeElement instanceof HTMLInputElement && activeElement.id === 'search-input') {
+          activeElement.blur()
+        }
+        if (previewImage) {
+          setPreviewImage(null)
           return
         }
-        e.preventDefault()
-        handleActivate(items[selectedIndex])
+
+        const selectedEntry = items[selectedIndex]
+        if (!selectedEntry) return
+
+        if (selectedEntry.kind === 'history' && selectedEntry.item.type === 'image') {
+          setPreviewImage(selectedEntry.item)
+          return
+        }
+
+        handleActivate(selectedEntry)
       } else if (e.key === 'Escape') {
+        if (previewImage) {
+          setPreviewImage(null)
+          return
+        }
         window.electronAPI.hideWindow()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTab, handleActivate, items, paramDialogState, selectedIndex, setSelectedIndex])
+  }, [handleActivate, items, paramDialogState, previewImage, selectedIndex, setSelectedIndex])
 
   useEffect(() => {
     if (listRef.current) {

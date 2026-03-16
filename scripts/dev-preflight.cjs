@@ -1,5 +1,6 @@
 const { execSync } = require('child_process')
 const path = require('path')
+const isWindows = process.platform === 'win32'
 
 function run(command) {
   try {
@@ -50,6 +51,11 @@ const concurrentlyWrapper = path.join(cwd, 'node_modules/.bin/concurrently')
 
 // 清理端口占用
 run('npx kill-port 5173')
+
+if (isWindows) {
+  // Windows 上跳过 ps 扫描，仅保留端口清理即可避免 shell 兼容问题。
+  process.exit(0)
+}
 
 for (const proc of listProcesses()) {
   const command = proc.command

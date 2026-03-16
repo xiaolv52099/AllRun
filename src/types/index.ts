@@ -71,7 +71,7 @@ export type TabType = 'all' | 'text' | 'image' | 'favorites' | 'commands'
 
 export interface ClipboardContent {
   type: HistoryType
-  content: string
+  content: string | string[]
   formats?: string[]
 }
 
@@ -118,4 +118,5 @@ export interface ElectronAPI {
   onShortcutTriggered: (callback: (action: string) => void) => () => void
   onWindowOpened: (callback: () => void) => () => void
   onConfigUpdated: (callback: (config: AppConfig) => void) => () => void
+  onCommandsUpdated: (callback: (commands: Command[]) => void) => () => void
 }

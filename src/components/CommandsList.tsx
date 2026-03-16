@@ -154,6 +154,10 @@ export default function CommandsList() {
         setSelectedIndex(selectedIndex <= 0 ? filteredCommands.length - 1 : selectedIndex - 1)
       } else if (e.key === 'Enter' && filteredCommands[selectedIndex]) {
         e.preventDefault()
+        const activeElement = document.activeElement
+        if (activeElement instanceof HTMLInputElement && activeElement.id === 'search-input') {
+          activeElement.blur()
+        }
         handleExecute(filteredCommands[selectedIndex])
       }
     }

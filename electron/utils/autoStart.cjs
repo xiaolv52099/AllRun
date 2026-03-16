@@ -1,10 +1,15 @@
 const { app } = require('electron');
 
 function setAutoStart(enabled) {
-  app.setLoginItemSettings({
+  const options = {
     openAtLogin: enabled,
-    openAsHidden: true
-  })
+  }
+
+  if (process.platform === 'darwin') {
+    options.openAsHidden = true
+  }
+
+  app.setLoginItemSettings(options)
 }
 
 function isAutoStartEnabled() {

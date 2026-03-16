@@ -1,6 +1,6 @@
 # AllRun
 
-AllRun 是一款以 macOS 为主要运行环境的剪切板效率工具，支持历史记录管理、收藏备注、图片预览复制、快捷指令执行、独立设置窗口与多语言切换。
+AllRun 是一款支持 macOS + Windows 的剪切板效率工具，支持历史记录管理、收藏备注、图片预览复制、快捷指令执行、独立设置窗口与多语言切换。
 
 ## 技术架构
 
@@ -29,9 +29,10 @@ AllRun 是一款以 macOS 为主要运行环境的剪切板效率工具，支持
 
 - Node.js >= 18
 - npm >= 9
-- macOS（建议 12+，Apple Silicon / Intel 均可打包）
+- macOS（建议 12+，Apple Silicon / Intel）
+- Windows（建议 Windows 10 / 11）
 
-建议授予辅助功能权限（用于更稳定的前台应用切回与自动粘贴体验）。
+建议授予系统辅助权限（尤其在 macOS 上，用于更稳定的前台应用切回与自动粘贴体验）。
 
 ## 安装与启动
 
@@ -52,8 +53,8 @@ npm run dev
 
 ### 1. 窗口与快捷键
 
-- 全局快捷键显示/隐藏主窗口（默认 `Cmd+1`）
-- 快捷键打开设置窗口（默认 `Cmd+,`）
+- 全局快捷键显示/隐藏主窗口（默认 `CommandOrControl+1`，即 `Cmd+1` / `Ctrl+1`）
+- 快捷键打开设置窗口（默认 `CommandOrControl+,`，即 `Cmd+,` / `Ctrl+,`）
 - 主界面与设置界面为独立窗口
 - 设置窗口支持鼠标拖拽边缘缩放，关闭后保持上次尺寸
 - 标题栏提供关闭按钮（mac 风格）和设置按钮
@@ -69,8 +70,10 @@ npm run dev
 
 ### 3. Tab 与搜索
 
-- Tab：`全部 / 文本 / 图片 / 收藏 / 指令`
+- Tab 默认顺序：`全部 / 指令 / 文本 / 收藏 / 图片`
+- 支持拖拽自定义 Tab 顺序（持久化保存）
 - `全部 + 搜索` 会合并展示历史项和指令项
+- `全部 + 搜索` 中会优先展示指令项
 - Fuse.js 模糊搜索，80ms 防抖
 - 搜索命中高亮（橙色）
 - 收藏备注支持搜索与高亮
@@ -78,6 +81,7 @@ npm run dev
 ### 4. 键盘导航
 
 - `↑/↓`：列表导航
+- `↑` 在第一项会循环到最后一项
 - `↓` 在最后一项会循环到第一项
 - `Enter`：执行当前选中项（图片 Tab 不触发 Enter 执行）
 - `Esc`：隐藏窗口
@@ -94,6 +98,7 @@ npm run dev
 - 文本可收藏/取消收藏
 - 收藏页支持备注展示与编辑（行内编辑、保存/取消）
 - 收藏项中时间与备注同一行紧凑展示
+- 收藏页支持拖拽排序（持久化保存）
 
 ### 7. 快捷指令
 
@@ -118,6 +123,7 @@ npm run dev
 - 支持命名输入：`参数名=值`
 
 指令可在“指令”Tab管理，也支持在“全部”Tab搜索后直接执行。
+- 指令 Tab 支持拖拽排序（持久化保存）
 
 ### 8. 设置页
 
@@ -139,7 +145,8 @@ npm run dev
 
 用户数据保存在：
 
-`~/Library/Application Support/allrun/`
+- macOS：`~/Library/Application Support/allrun/`
+- Windows：`%APPDATA%/allrun/`
 
 主要文件：
 
@@ -147,6 +154,41 @@ npm run dev
 - `favorites.json`
 - `commands.json`
 - `config.json`
+
+## 跨平台适配计划（已执行）
+
+### 阶段 1：兼容性分析
+
+- 审计主进程平台相关逻辑（窗口唤起、自动粘贴、剪贴板文件格式）
+- 审计开发与打包脚本（`dev`、图标、`electron-builder`）
+- 审计命令执行器在 Windows 下的解释器与路径处理
+
+### 阶段 2：开发改造
+
+- 主进程：
+  - 保持 macOS 现有效果不变（AppleScript 前台切回、自动粘贴、Dock 隐藏）
+  - 新增 Windows 粘贴分支（`Ctrl+V` 发送）
+  - 窗口视觉效果配置改为仅在 macOS 启用
+- 剪贴板：
+  - 新增共享文件路径解析模块，兼容 macOS `public.file-url` 与 Windows `FileNameW/FileName`
+- 指令执行：
+  - 统一 `~` 路径展开（兼容 `HOME/USERPROFILE`）
+  - 脚本执行器补齐 Windows 参数（`cmd /c`、`powershell -File`）
+- 工具链：
+  - `dev:electron` 改为跨平台命令
+  - `dev-preflight` 增加 Windows 分支
+  - 图标脚本支持跨平台生成 `icon.ico`
+
+### 阶段 3：验证与打包
+
+- 静态检查：
+  - `npm run lint`
+  - `npx tsc --noEmit`
+- 打包验证：
+  - `npm run icon:generate`
+  - `npm run build`（macOS DMG）
+  - `npm run build:win:dir`（Windows 目录包）
+  - `npm run build:win`（Windows NSIS 安装包）
 
 ## 测试与质量检查
 
@@ -204,7 +246,16 @@ npm run icon:generate
 # 仅打包目录（不生成安装包）
 npm run build:dir
 
-# 生成安装包（DMG）
+# 仅打包 macOS
+npm run build:mac
+
+# 仅打包 Windows（NSIS 安装包）
+npm run build:win
+
+# 仅打包 Windows 目录（无安装器）
+npm run build:win:dir
+
+# 当前平台默认打包
 npm run build
 ```
 
@@ -216,12 +267,21 @@ npm run build
 - `release/AllRun-1.0.0.dmg`
 - `release/mac-arm64/AllRun.app`
 - `release/mac/AllRun.app`
+- `release/AllRun Setup 1.0.0.exe`
+- `release/win-unpacked/`
+- `release/win-arm64-unpacked/`
 
-### 3) macOS 安装启动
+### 3) 安装启动
 
-- 打开对应架构的 `.dmg`
-- 拖拽 `AllRun.app` 到 `Applications`
-- 首次可通过右键“打开”放行未签名应用
+- macOS：
+  - 打开对应架构的 `.dmg`
+  - 拖拽 `AllRun.app` 到 `Applications`
+  - 首次可通过右键“打开”放行未签名应用
+
+- Windows：
+  - 运行 `AllRun Setup 1.0.0.exe`
+  - 选择安装目录并完成安装
+  - 首次运行若被系统拦截，请在“更多信息”中选择继续运行
 
 ## 许可证
 

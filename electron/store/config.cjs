@@ -6,12 +6,12 @@ const DEFAULT_TAB_ORDER = ['all', 'commands', 'text', 'favorites', 'image']
 
 const DEFAULT_CONFIG = {
   window: {
-    width: 500,
-    height: 600
+    width: 450,
+    height: 400
   },
   settingsWindow: {
-    width: 860,
-    height: 680
+    width: 450,
+    height: 400
   },
   shortcuts: {
     toggleWindow: 'CommandOrControl+1',

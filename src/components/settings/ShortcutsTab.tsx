@@ -30,6 +30,7 @@ export default function ShortcutsTab() {
   const [editingKey, setEditingKey] = useState<ShortcutKey | null>(null)
   const [tempShortcut, setTempShortcut] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const isMac = navigator.platform.toLowerCase().includes('mac')
 
   useEffect(() => {
     if (editingKey && inputRef.current) {
@@ -45,8 +46,7 @@ export default function ShortcutsTab() {
 
     const keys: string[] = []
 
-    if (e.metaKey) keys.push('Cmd')
-    if (e.ctrlKey) keys.push('Ctrl')
+    if (e.metaKey || e.ctrlKey) keys.push('CommandOrControl')
     if (e.altKey) keys.push('Alt')
     if (e.shiftKey) keys.push('Shift')
 
@@ -81,7 +81,8 @@ export default function ShortcutsTab() {
 
   const formatShortcut = (shortcut: string) => {
     return shortcut
-      .replace('CommandOrControl', 'Cmd')
+      .replace('CommandOrControl', isMac ? 'Cmd' : 'Ctrl')
+      .replace('Cmd', isMac ? 'Cmd' : 'Ctrl')
       .replace(/\+/g, ' + ')
   }
 

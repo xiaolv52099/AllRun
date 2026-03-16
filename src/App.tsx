@@ -62,6 +62,14 @@ function App() {
     })
   }, [hasElectronAPI, setConfig])
 
+  useEffect(() => {
+    if (!hasElectronAPI) return
+
+    return window.electronAPI.onCommandsUpdated((nextCommands) => {
+      setCommands(nextCommands)
+    })
+  }, [hasElectronAPI, setCommands])
+
   if (!hasElectronAPI) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
@@ -115,6 +123,11 @@ function MainWindow({
   tabOrder: TabType[]
   t: (key: string, vars?: Record<string, string | number>) => string
 }) {
+  const isWindows = useMemo(
+    () => typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('win'),
+    []
+  )
+
   // 监听设置快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -204,23 +217,38 @@ function MainWindow({
   return (
     <div className="h-screen flex flex-col bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
       <div className="drag-region relative h-8 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
-        <div className="absolute left-2 inset-y-0 flex items-center">
-          <button
-            onClick={() => window.electronAPI.hideWindow()}
-            className="no-drag w-3 h-3 rounded-full bg-[#ff5f57] flex items-center justify-center hover:brightness-110 transition"
-            title={t('window.close')}
-          >
-            <X className="w-2 h-2 text-black/80" strokeWidth={2.5} />
-          </button>
-        </div>
+        {!isWindows && (
+          <div className="absolute left-2 inset-y-0 flex items-center">
+            <button
+              onClick={() => window.electronAPI.hideWindow()}
+              className="no-drag w-3 h-3 rounded-full bg-[#ff5f57] flex items-center justify-center hover:brightness-110 transition"
+              title={t('window.close')}
+            >
+              <X className="w-2 h-2 text-black/80" strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
         <div className="absolute right-2 inset-y-0 flex items-center">
-          <button
-            onClick={() => window.electronAPI.openSettingsWindow()}
-            className="no-drag p-1 rounded hover:bg-[var(--color-bg-hover)] transition-colors"
-            title={t('window.settings')}
-          >
-            <Settings2 className="w-3.5 h-3.5 text-[var(--color-title)]" />
-          </button>
+          <div className="no-drag flex items-center">
+            <button
+              onClick={() => window.electronAPI.openSettingsWindow()}
+              className={`p-1 rounded transition-colors ${
+                isWindows ? 'mr-1 hover:bg-[var(--color-bg-hover)]' : 'hover:bg-[var(--color-bg-hover)]'
+              }`}
+              title={t('window.settings')}
+            >
+              <Settings2 className="w-3.5 h-3.5 text-[var(--color-title)]" />
+            </button>
+            {isWindows && (
+              <button
+                onClick={() => window.electronAPI.hideWindow()}
+                className="h-6 w-10 flex items-center justify-center rounded-sm text-[var(--color-text-secondary)] hover:text-white hover:bg-[#e81123] transition-colors"
+                title={t('window.close')}
+              >
+                <X className="w-3.5 h-3.5" strokeWidth={2} />
+              </button>
+            )}
+          </div>
         </div>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span className="text-xs text-[var(--color-title)] font-medium">{t('app.name')}</span>

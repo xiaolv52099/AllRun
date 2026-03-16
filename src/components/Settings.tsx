@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../stores/useStore'
 import GeneralTab from './settings/GeneralTab'
@@ -12,6 +12,10 @@ export default function Settings() {
   const { setConfig } = useStore()
   const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
+  const isWindows = useMemo(
+    () => typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('win'),
+    []
+  )
 
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'general', label: t('settings.tab.general') },
@@ -34,15 +38,28 @@ export default function Settings() {
   return (
     <div className="h-screen flex flex-col bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
       <div className="drag-region relative h-8 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
-        <div className="absolute left-2 inset-y-0 flex items-center">
-          <button
-            onClick={() => window.electronAPI.closeSettingsWindow()}
-            className="no-drag w-3 h-3 rounded-full bg-[#ff5f57] flex items-center justify-center hover:brightness-110 transition"
-            title={t('window.close')}
-          >
-            <X className="w-2 h-2 text-black/80" strokeWidth={2.5} />
-          </button>
-        </div>
+        {!isWindows && (
+          <div className="absolute left-2 inset-y-0 flex items-center">
+            <button
+              onClick={() => window.electronAPI.closeSettingsWindow()}
+              className="no-drag w-3 h-3 rounded-full bg-[#ff5f57] flex items-center justify-center hover:brightness-110 transition"
+              title={t('window.close')}
+            >
+              <X className="w-2 h-2 text-black/80" strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
+        {isWindows && (
+          <div className="absolute right-2 inset-y-0 flex items-center no-drag">
+            <button
+              onClick={() => window.electronAPI.closeSettingsWindow()}
+              className="h-6 w-10 flex items-center justify-center rounded-sm text-[var(--color-text-secondary)] hover:text-white hover:bg-[#e81123] transition-colors"
+              title={t('window.close')}
+            >
+              <X className="w-3.5 h-3.5" strokeWidth={2} />
+            </button>
+          </div>
+        )}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span className="text-xs text-[var(--color-title)] font-medium">{t('settings.title')}</span>
         </div>
