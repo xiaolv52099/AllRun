@@ -24,6 +24,7 @@ let configStore
 let commandsStore
 let commandExecutor
 let lastFrontmostAppPid = null
+let lastFrontmostWindowHandle = null
 const isDarwin = process.platform === 'darwin'
 const isWindows = process.platform === 'win32'
 
@@ -157,11 +158,16 @@ public static class Win32 {
 $hwnd = [Win32]::GetForegroundWindow()
 $pid = 0
 [Win32]::GetWindowThreadProcessId($hwnd, [ref]$pid) | Out-Null
-Write-Output $pid
+Write-Output ("{0}|{1}" -f $pid, $hwnd.ToInt64())
 `)
-      const pid = Number.parseInt(output, 10)
+      const [pidRaw, hwndRaw] = output.split('|')
+      const pid = Number.parseInt(pidRaw, 10)
+      const hwnd = Number.parseInt(hwndRaw, 10)
       if (Number.isFinite(pid) && pid !== process.pid) {
         lastFrontmostAppPid = pid
+      }
+      if (Number.isFinite(hwnd) && hwnd > 0) {
+        lastFrontmostWindowHandle = hwnd
       }
     } catch {
       // Windows 下获取前台窗口失败时静默降级
@@ -170,7 +176,7 @@ Write-Output $pid
 }
 
 async function focusLastFrontmostApplication() {
-  if (!lastFrontmostAppPid) {
+  if (!lastFrontmostAppPid && !(Number.isFinite(lastFrontmostWindowHandle) && lastFrontmostWindowHandle > 0)) {
     return
   }
 
@@ -187,13 +193,68 @@ async function focusLastFrontmostApplication() {
 
   if (isWindows) {
     try {
-      await runPowerShell(`
+      if (Number.isFinite(lastFrontmostWindowHandle) && lastFrontmostWindowHandle > 0) {
+        await runPowerShell(`
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class Win32 {
+  [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+}
+"@
+$hwnd = [IntPtr]::new(${lastFrontmostWindowHandle})
+if ([Win32]::IsWindow($hwnd)) {
+  if ([Win32]::IsIconic($hwnd)) {
+    [Win32]::ShowWindowAsync($hwnd, 9) | Out-Null
+    Start-Sleep -Milliseconds 40
+  }
+  [Win32]::BringWindowToTop($hwnd) | Out-Null
+  [Win32]::SetForegroundWindow($hwnd) | Out-Null
+} else {
+  throw "Invalid frontmost window handle"
+}
+`)
+      } else {
+        await runPowerShell(`
 $ws = New-Object -ComObject WScript.Shell
 $null = $ws.AppActivate(${lastFrontmostAppPid})
 `)
+      }
     } catch {
       // ignore
     }
+  }
+}
+
+async function sendPasteShortcut() {
+  if (isDarwin) {
+    await runAppleScript('tell application "System Events" to keystroke "v" using command down')
+    return
+  }
+
+  if (isWindows) {
+    await runPowerShell(`
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class Win32 {
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+}
+"@
+$VK_CONTROL = 0x11
+$VK_V = 0x56
+$KEYEVENTF_KEYUP = 0x0002
+[Win32]::keybd_event($VK_CONTROL, 0, 0, [UIntPtr]::Zero)
+[Win32]::keybd_event($VK_V, 0, 0, [UIntPtr]::Zero)
+Start-Sleep -Milliseconds 30
+[Win32]::keybd_event($VK_V, 0, $KEYEVENTF_KEYUP, [UIntPtr]::Zero)
+[Win32]::keybd_event($VK_CONTROL, 0, $KEYEVENTF_KEYUP, [UIntPtr]::Zero)
+`)
   }
 }
 
@@ -203,24 +264,22 @@ async function pasteTextAtCursor(text) {
   }
 
   clipboard.writeText(text)
-  mainWindow?.hide()
+  await hideAllWindows()
 
   if (isDarwin) {
     await focusLastFrontmostApplication()
-    await sleep(40)
+    await sleep(80)
     try {
-      await runAppleScript('tell application "System Events" to keystroke "v" using command down')
+      await sendPasteShortcut()
     } catch (error) {
       console.error('Failed to paste text at cursor:', error)
       return false
     }
   } else if (isWindows) {
     await focusLastFrontmostApplication()
-    await sleep(40)
+    await sleep(120)
     try {
-      await runPowerShell(
-        '$ws = New-Object -ComObject WScript.Shell; $ws.SendKeys("^v")'
-      )
+      await sendPasteShortcut()
     } catch (error) {
       console.error('Failed to paste text at cursor (Windows):', error)
       return false
